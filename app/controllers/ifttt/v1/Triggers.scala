@@ -72,11 +72,8 @@ object Triggers extends Controller {
             val request = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
 
             request.map { queryResponse =>
-              println(queryResponse.json)
 
               val jsonResult = queryResponse.json.transform(queryResultToIFTTT)
-
-              println(jsonResult)
 
               jsonResult match {
                 case JsSuccess(json, _) =>
