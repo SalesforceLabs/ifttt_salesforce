@@ -16,7 +16,9 @@ object Test {
       val json = Json.obj(
         "data" -> Json.obj(
           "accessToken" -> Play.current.configuration.getString("ifttt.test.accesstoken").get,
-          "samples" -> Json.obj()
+          "samples" -> Json.obj(
+            "triggers" -> Json.obj()
+          )
         )
       )
 

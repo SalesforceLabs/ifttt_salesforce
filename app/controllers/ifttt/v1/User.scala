@@ -12,7 +12,24 @@ import scala.concurrent.Future
 
 object User extends Controller {
 
-  def info = Action.async { request =>
+  private def createWebhook(authToken: String, instanceUrl: String, name: String, sobject: String, events: Seq[String], webhookUrl: String) = {
+
+    val webhookCreatorUrl = "https://salesforce-webhook-creator.herokuapp.com/webhooks"
+
+    val headers = Seq("X-SESSION-ID" -> authToken, "X-INSTANCE-URL" -> instanceUrl)
+
+    val json = Json.obj(
+      "name" -> name,
+      "sobject" -> sobject,
+      "events" -> events,
+      "url" -> webhookUrl,
+      "rollbackOnError" -> false
+    )
+
+    WS.url(webhookCreatorUrl).withHeaders(headers: _*).post(json)
+  }
+
+  def info = Action.async { implicit request =>
     request.headers.get(AUTHORIZATION) match {
       case Some(auth) =>
         val userinfoFuture = WS.
@@ -23,6 +40,13 @@ object User extends Controller {
         userinfoFuture.map { response =>
           response.status match {
             case OK =>
+
+              val authToken = auth.stripPrefix("Bearer ")
+
+              val instanceUrl = (response.json \ "profile").as[String].stripSuffix("/" + (response.json \ "user_id").as[String])
+
+              createWebhook(authToken, instanceUrl, "IFTTTOpportunity", "Opportunity", Seq("after update"), routes.Webhooks.opportunityWasWon().absoluteURL())
+
               val jsonResult = response.json.transform {
                 val reads = {
                   (__ \ 'data \ 'id).json.copyFrom((__ \ 'user_id).json.pick) and
@@ -51,7 +75,6 @@ object User extends Controller {
             case _ =>
               Status(response.status)(response.body)
           }
-
 
         }
       case None =>
