@@ -17,7 +17,12 @@ object Test {
         "data" -> Json.obj(
           "accessToken" -> Play.current.configuration.getString("ifttt.test.accesstoken").get,
           "samples" -> Json.obj(
-            "triggers" -> Json.obj()
+            "triggers" -> Json.obj(),
+            "actions" -> Json.obj(
+              "post_on_chatter" -> Json.obj(
+                "message" -> "A test message"
+              )
+            )
           )
         )
       )
