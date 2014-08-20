@@ -28,7 +28,7 @@ class TriggersSpec extends Specification with JsonMatchers {
           |  ]
           |}""".stripMargin)
 
-      val actualIFTTTResponse = queryResult.transform(Triggers.queryResultToIFTTT).asEither
+      val actualIFTTTResponse = queryResult.transform(Triggers.opportunityQueryResultToIFTTT).asEither
 
       actualIFTTTResponse must beRight { json: JsObject =>
         json.toString must /(
