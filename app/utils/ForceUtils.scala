@@ -1,6 +1,7 @@
 package utils
 
 import play.api.http.{Status, HeaderNames}
+import play.api.libs.json.JsValue
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -36,5 +37,11 @@ object ForceUtils {
       }
     }
   }
+
+  def queryUrl(value: JsValue) = (value \ "urls" \ "query").as[String].replace("{version}", API_VERSION)
+
+  def sobjectsUrl(value: JsValue) = (value \ "urls" \ "sobjects").as[String].replace("{version}", API_VERSION)
+
+  def instanceUrl(value: JsValue) =  (value \ "profile").as[String].stripSuffix("/" + (value \ "user_id").as[String])
 
 }

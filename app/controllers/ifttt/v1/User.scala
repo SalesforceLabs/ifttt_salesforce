@@ -7,6 +7,7 @@ import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.json.Reads._
 import play.api.libs.functional.syntax._
+import utils.ForceUtils
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -45,7 +46,7 @@ object User extends Controller {
 
               val authToken = auth.stripPrefix("Bearer ")
 
-              val instanceUrl = (response.json \ "profile").as[String].stripSuffix("/" + (response.json \ "user_id").as[String])
+              val instanceUrl = ForceUtils.instanceUrl(response.json)
 
               //createWebhook(authToken, instanceUrl, "IFTTTOpportunity", "Opportunity", Seq("after update"), routes.Webhooks.opportunityWasWon().absoluteURL())
 

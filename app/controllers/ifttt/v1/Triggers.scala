@@ -16,6 +16,8 @@ import scala.concurrent.Future
 
 object Triggers extends Controller {
 
+  // todo: I'm sure there is a much better way to compose these JSON transformers
+
   val opportunityQueryResultToIFTTT: Reads[JsObject] = (__ \ 'data).json.copyFrom(
     (__ \ 'records).json.pick(
       of[JsArray].map {
@@ -62,6 +64,33 @@ object Triggers extends Controller {
                 "type" -> eventType,
                 "subject" -> subject,
                 "message" -> message,
+                "meta" -> Json.obj(
+                  "id" -> id,
+                  "timestamp" -> timestamp.getTime / 1000
+                )
+              )
+            case _ =>
+              Json.obj()
+          }
+          JsArray(newArr)
+      }
+    )
+  )
+
+  def anyQueryResultToIFTTT(instanceUrl: String): Reads[JsObject] = (__ \ 'data).json.copyFrom(
+    (__ \ 'records).json.pick(
+      of[JsArray].map {
+        case JsArray(arr) =>
+          val newArr = arr.map {
+            case j: JsObject =>
+              val id = (j \ "Id").as[String]
+              val timestamp = (j \ "LastModifiedDate").as[Date]
+              val name = (j \ "Name").as[String]
+              val linkToRecord = instanceUrl + id
+
+              Json.obj(
+                "link_to_record" -> linkToRecord,
+                "name" -> name,
                 "meta" -> Json.obj(
                   "id" -> id,
                   "timestamp" -> timestamp.getTime / 1000
@@ -208,6 +237,129 @@ object Triggers extends Controller {
       } getOrElse Future.successful(Unauthorized)
     }
 
+  }
+
+  def recordCreatedOrUpdatedTrigger() = Action.async(parse.json) { request =>
+
+    val limit = (request.body \ "limit").asOpt[Int].getOrElse(5000)
+
+    val maybeSObjectAndQueryCritera = for {
+      sobject <- (request.body \ "triggerFields" \ "sobject").asOpt[String]
+      queryCriteria <- (request.body \ "triggerFields" \ "query_criteria").asOpt[String]
+    } yield (sobject, queryCriteria)
+
+    maybeSObjectAndQueryCritera.fold {
+      val json = Json.obj(
+        "errors" -> Json.arr(
+          Json.obj(
+            "message" -> "trigger fields 'sobject' and 'query_criteria' are required"
+          )
+        )
+      )
+      Future.successful(BadRequest(json))
+    } { case (sobject, queryCriteria) =>
+
+      request.headers.get(AUTHORIZATION).map { auth =>
+
+        ForceUtils.userinfo(auth).flatMap { userinfoResponse =>
+
+          userinfoResponse.status match {
+            case OK =>
+              val url = (userinfoResponse.json \ "urls" \ "query").as[String].replace("{version}", "30.0")
+
+              val instanceUrl = ForceUtils.instanceUrl(userinfoResponse.json)
+
+              val whereStatement = if (queryCriteria != "") {
+                s"WHERE $queryCriteria"
+              }
+              else {
+                ""
+              }
+
+              val query = s"""
+                |SELECT Id, Name, LastModifiedDate
+                |FROM $sobject
+                |$whereStatement
+                |ORDER BY LastModifiedDate DESC
+                |LIMIT $limit
+              """.stripMargin
+
+              val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
+
+              queryRequest.map { queryResponse =>
+
+                val jsonResult = queryResponse.json.transform(anyQueryResultToIFTTT(instanceUrl))
+
+                jsonResult match {
+                  case JsSuccess(json, _) =>
+                    Ok(json)
+                  case JsError(error) =>
+                    InternalServerError(Json.obj("error" -> error.toString))
+                }
+              }
+            case FORBIDDEN =>
+              val json = Json.obj(
+                "errors" -> Json.arr(
+                  Json.obj(
+                    "status" -> userinfoResponse.body,
+                    "message" -> ("Authentication failed: " + userinfoResponse.body)
+                  )
+                )
+              )
+              Future.successful(Unauthorized(json))
+            case _ =>
+              Future.successful(Status(userinfoResponse.status)(userinfoResponse.body))
+          }
+        }
+
+      } getOrElse Future.successful(Unauthorized)
+    }
+
+  }
+
+  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = Action.async(parse.json) { request =>
+
+      request.headers.get(AUTHORIZATION).map { auth =>
+
+        ForceUtils.userinfo(auth).flatMap { userinfoResponse =>
+
+          userinfoResponse.status match {
+            case OK =>
+              val url = ForceUtils.sobjectsUrl(userinfoResponse.json)
+
+              val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).get()
+
+              queryRequest.map { queryResponse =>
+
+                val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
+
+                // todo: use a JSON transformer
+                val options = sobjects.filter(_.\("queryable").as[Boolean]).map { json =>
+                    Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
+                }
+
+                Ok(
+                  Json.obj(
+                    "data" -> options
+                  )
+                )
+              }
+            case FORBIDDEN =>
+              val json = Json.obj(
+                "errors" -> Json.arr(
+                  Json.obj(
+                    "status" -> userinfoResponse.body,
+                    "message" -> ("Authentication failed: " + userinfoResponse.body)
+                  )
+                )
+              )
+              Future.successful(Unauthorized(json))
+            case _ =>
+              Future.successful(Status(userinfoResponse.status)(userinfoResponse.body))
+          }
+        }
+
+      } getOrElse Future.successful(Unauthorized)
   }
 
 }

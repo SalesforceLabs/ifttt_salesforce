@@ -20,6 +20,10 @@ object Test {
             "triggers" -> Json.obj(
               "custom_salesforce_trigger" -> Json.obj(
                 "type" -> "test"
+              ),
+              "record_created_or_updated_trigger" -> Json.obj(
+                "sobject" -> "Contact",
+                "query_criteria" -> "Phone != null"
               )
             ),
             "actions" -> Json.obj(
