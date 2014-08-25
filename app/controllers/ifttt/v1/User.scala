@@ -12,6 +12,7 @@ import scala.concurrent.Future
 
 object User extends Controller {
 
+  /*
   private def createWebhook(authToken: String, instanceUrl: String, name: String, sobject: String, events: Seq[String], webhookUrl: String) = {
 
     val webhookCreatorUrl = "https://salesforce-webhook-creator.herokuapp.com/webhooks"
@@ -28,6 +29,7 @@ object User extends Controller {
 
     WS.url(webhookCreatorUrl).withHeaders(headers: _*).post(json)
   }
+  */
 
   def info = Action.async { implicit request =>
     request.headers.get(AUTHORIZATION) match {
@@ -45,7 +47,7 @@ object User extends Controller {
 
               val instanceUrl = (response.json \ "profile").as[String].stripSuffix("/" + (response.json \ "user_id").as[String])
 
-              createWebhook(authToken, instanceUrl, "IFTTTOpportunity", "Opportunity", Seq("after update"), routes.Webhooks.opportunityWasWon().absoluteURL())
+              //createWebhook(authToken, instanceUrl, "IFTTTOpportunity", "Opportunity", Seq("after update"), routes.Webhooks.opportunityWasWon().absoluteURL())
 
               val jsonResult = response.json.transform {
                 val reads = {

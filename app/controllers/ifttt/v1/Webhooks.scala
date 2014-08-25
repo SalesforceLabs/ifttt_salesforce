@@ -7,6 +7,7 @@ import play.api.libs.json.Json
 import play.api.libs.ws.WS
 import play.api.mvc.{Action, Controller}
 import play.api.Play.current
+import utils.Global
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
@@ -43,6 +44,9 @@ object Webhooks extends Controller {
     }
   }
 
+  /*
+    An outbound message inserts a new record into the IFTTT Event SObject
+   */
   def customSalesforceTrigger() = Action.async(parse.xml) { request =>
 
     val sessionId = (request.body \ "Body" \ "notifications" \ "SessionId").text
@@ -84,6 +88,28 @@ object Webhooks extends Controller {
              |</soapenv:Envelope>
            """.stripMargin).as("text/xml")
       }
+    }
+  }
+
+  /*
+   A Trigger in Salesforce calls this webhook which notifies IFTTT that an event happened for each of the users watching for events
+    */
+  def ifttt_event() = Action.async(parse.json) { request =>
+
+    val orgId = (request.body \ "orgId").as[String]
+
+    Global.redis.smembers[String](orgId).flatMap { watchers =>
+        val json = Json.obj(
+          "data" -> watchers.map { userId =>
+            Json.obj("user_id" -> userId)
+          }
+        )
+
+        WS.
+          url("https://realtime.ifttt.com/v1/notifications").
+          withHeaders("IFTTT-Channel-Key" -> Global.ifffChannelKey).
+          post(json).
+          map(r => Ok)
     }
   }
 

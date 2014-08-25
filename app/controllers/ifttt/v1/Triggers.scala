@@ -9,7 +9,7 @@ import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.json.Reads._
 import play.api.libs.functional.syntax._
-import utils.ForceUtils
+import utils.{Global, ForceUtils}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
@@ -154,6 +154,13 @@ object Triggers extends Controller {
           userinfoResponse.status match {
             case OK =>
               val url = (userinfoResponse.json \ "urls" \ "query").as[String].replace("{version}", "30.0")
+
+              val userId = (userinfoResponse.json \ "user_id").as[String]
+
+              val orgId = (userinfoResponse.json \ "organization_id").as[String]
+
+              // add the user to the watchers in this org in order to support real-time notifications
+              Global.redis.sadd(orgId, userId)
 
               val whereStatement = if (eventType != "") {
                 s"WHERE ifttt__Type__c = '$eventType'"
