@@ -18,23 +18,24 @@ object Triggers extends Controller {
 
   // todo: I'm sure there is a much better way to compose these JSON transformers
 
-  val opportunityQueryResultToIFTTT: Reads[JsObject] = (__ \ 'data).json.copyFrom(
+  def opportunityWonQueryResultToIFTTT(instanceUrl: String, amounts: Map[String, Int]): Reads[JsObject] = (__ \ 'data).json.copyFrom(
     (__ \ 'records).json.pick(
       of[JsArray].map {
         case JsArray(arr) =>
           val newArr = arr.map {
             case j: JsObject =>
-              val name = (j \ "Name").as[String]
-              val amount = (j \ "Amount").asOpt[Int].getOrElse(0)
               val id = (j \ "Id").as[String]
               val timestamp = (j \ "LastModifiedDate").as[Date]
+              val name = (j \ "Name").as[String]
+              val oppId = (j \ "ifttt__Related_Object_Id__c").as[String]
 
               val nf = NumberFormat.getCurrencyInstance
               nf.setMaximumFractionDigits(0)
 
               Json.obj(
                 "name" -> name,
-                "amount" -> nf.format(amount),
+                "amount" -> nf.format(amounts.getOrElse(oppId, 0)),
+                "link_to_opportunity" -> (instanceUrl + oppId),
                 "meta" -> Json.obj(
                   "id" -> id,
                   "timestamp" -> timestamp.getTime / 1000
@@ -115,29 +116,54 @@ object Triggers extends Controller {
 
         userinfoResponse.status match {
           case OK =>
-            val url = (userinfoResponse.json \ "urls" \ "query").as[String].replace("{version}", "30.0")
+            val queryUrl = ForceUtils.queryUrl(userinfoResponse.json)
+
+            val sobjectUrl = ForceUtils.sobjectsUrl(userinfoResponse.json)
 
             val userId = (userinfoResponse.json \ "user_id").as[String]
 
-            val query =
-              s"""SELECT Id, Name, Amount, LastModifiedDate
-             |FROM Opportunity
-             |WHERE OwnerId = '$userId' AND StageName = 'Closed Won'
-             |ORDER BY LastModifiedDate DESC
-             |LIMIT $limit
-           """.stripMargin
+            val orgId = (userinfoResponse.json \ "organization_id").as[String]
 
-            val request = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
+            val instanceUrl = ForceUtils.instanceUrl(userinfoResponse.json)
 
-            request.map { queryResponse =>
+            // add the user to the watchers in this org in order to support real-time notifications
+            Global.redis.sadd(orgId, userId)
 
-              val jsonResult = queryResponse.json.transform(opportunityQueryResultToIFTTT)
+            val query = s"""
+                |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c, ifttt__Related_Object_Type__c, ifttt__Related_Object_Id__c
+                |FROM ifttt__IFTTT_Event__c
+                |WHERE ifttt__Type__c = 'Opportunity Won'
+                |ORDER BY LastModifiedDate DESC
+                |LIMIT $limit
+              """.stripMargin
 
-              jsonResult match {
-                case JsSuccess(json, _) =>
-                  Ok(json)
-                case JsError(error) =>
-                  InternalServerError(Json.obj("error" -> error.toString))
+            val queryRequest = WS.url(queryUrl).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
+
+            queryRequest.flatMap { queryResponse =>
+
+              val amountsFutures = (queryResponse.json \ "records").as[Seq[JsObject]].map { record =>
+                val oppId = (record \ "ifttt__Related_Object_Id__c").as[String]
+                val oppType = (record \ "ifttt__Related_Object_Type__c").as[String]
+                val url = s"$sobjectUrl$oppType/$oppId"
+
+                WS.url(url).withHeaders(AUTHORIZATION -> auth).get().map { opp =>
+                  (oppId, (opp.json \ "Amount").asOpt[Int])
+                }
+              }
+
+              Future.sequence(amountsFutures).map { amountsSeq =>
+
+                val amounts = amountsSeq.filter(_._2.isDefined).toMap.mapValues(_.get)
+
+                val jsonResult = queryResponse.json.transform(opportunityWonQueryResultToIFTTT(instanceUrl, amounts))
+
+                jsonResult match {
+                  case JsSuccess(json, _) =>
+                    Ok(json)
+                  case JsError(error) =>
+                    InternalServerError(Json.obj("error" -> error.toString))
+                }
+
               }
             }
           case FORBIDDEN =>

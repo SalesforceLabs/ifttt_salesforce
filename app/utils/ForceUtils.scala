@@ -42,6 +42,6 @@ object ForceUtils {
 
   def sobjectsUrl(value: JsValue) = (value \ "urls" \ "sobjects").as[String].replace("{version}", API_VERSION)
 
-  def instanceUrl(value: JsValue) =  (value \ "profile").as[String].stripSuffix("/" + (value \ "user_id").as[String])
+  def instanceUrl(value: JsValue) =  (value \ "profile").as[String].stripSuffix((value \ "user_id").as[String])
 
 }

@@ -1,6 +1,5 @@
 package controllers.ifttt.v1
 
-import play.api.http.MimeTypes
 import play.api.libs.ws.WS
 import play.api.mvc.{Action, Controller}
 import play.api.Play.current
@@ -12,25 +11,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object User extends Controller {
-
-  /*
-  private def createWebhook(authToken: String, instanceUrl: String, name: String, sobject: String, events: Seq[String], webhookUrl: String) = {
-
-    val webhookCreatorUrl = "https://salesforce-webhook-creator.herokuapp.com/webhooks"
-
-    val headers = Seq("X-SESSION-ID" -> authToken, "X-INSTANCE-URL" -> instanceUrl)
-
-    val json = Json.obj(
-      "name" -> name,
-      "sobject" -> sobject,
-      "events" -> events,
-      "url" -> webhookUrl,
-      "rollbackOnError" -> false
-    )
-
-    WS.url(webhookCreatorUrl).withHeaders(headers: _*).post(json)
-  }
-  */
 
   def info = Action.async { implicit request =>
     request.headers.get(AUTHORIZATION) match {
@@ -47,8 +27,6 @@ object User extends Controller {
               val authToken = auth.stripPrefix("Bearer ")
 
               val instanceUrl = ForceUtils.instanceUrl(response.json)
-
-              //createWebhook(authToken, instanceUrl, "IFTTTOpportunity", "Opportunity", Seq("after update"), routes.Webhooks.opportunityWasWon().absoluteURL())
 
               val jsonResult = response.json.transform {
                 val reads = {

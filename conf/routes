@@ -1,17 +1,17 @@
-GET         /services/oauth2/authorize                                                           controllers.OAuth2.authorize
+GET         /services/oauth2/authorize                                                         controllers.OAuth2.authorize
 
-POST        /services/oauth2/token                                                               controllers.OAuth2.token
+POST        /services/oauth2/token                                                             controllers.OAuth2.token
 
-GET         /ifttt/v1/status                                                                     controllers.ifttt.v1.Application.status
-GET         /ifttt/v1/user/info                                                                  controllers.ifttt.v1.User.info
-POST        /ifttt/v1/test/setup                                                                 controllers.ifttt.v1.Test.setup
+GET         /ifttt/v1/status                                                                   controllers.ifttt.v1.Application.status
+GET         /ifttt/v1/user/info                                                                controllers.ifttt.v1.User.info
+POST        /ifttt/v1/test/setup                                                               controllers.ifttt.v1.Test.setup
 
-POST        /ifttt/v1/triggers/opportunity_was_won                                               controllers.ifttt.v1.Triggers.opportunityWasWon
-POST        /ifttt/v1/triggers/custom_salesforce_trigger                                         controllers.ifttt.v1.Triggers.customSalesforceTrigger
-POST        /ifttt/v1/triggers/record_created_or_updated_trigger                                 controllers.ifttt.v1.Triggers.recordCreatedOrUpdatedTrigger
-POST        /ifttt/v1/triggers/record_created_or_updated_trigger/fields/sobject/options          controllers.ifttt.v1.Triggers.recordCreatedOrUpdatedTriggerFieldsSObjectOptions
-POST        /ifttt/v1/webhook/opportunity_was_won                                                controllers.ifttt.v1.Webhooks.opportunityWasWon
-POST        /ifttt/v1/webhook/ifttt_event                                                        controllers.ifttt.v1.Webhooks.ifttt_event
-POST        /ifttt/v1/webhook/custom_salesforce_trigger                                          controllers.ifttt.v1.Webhooks.customSalesforceTrigger
+POST        /ifttt/v1/triggers/opportunity_was_won                                             controllers.ifttt.v1.Triggers.opportunityWasWon
+POST        /ifttt/v1/triggers/custom_salesforce_trigger                                       controllers.ifttt.v1.Triggers.customSalesforceTrigger
+POST        /ifttt/v1/triggers/record_created_or_updated_trigger                               controllers.ifttt.v1.Triggers.recordCreatedOrUpdatedTrigger
+POST        /ifttt/v1/triggers/record_created_or_updated_trigger/fields/sobject/options        controllers.ifttt.v1.Triggers.recordCreatedOrUpdatedTriggerFieldsSObjectOptions
 
-POST        /ifttt/v1/actions/post_on_chatter                                                    controllers.ifttt.v1.Actions.postOnChatter
+POST        /ifttt/v1/webhook/ifttt_event                                                      controllers.ifttt.v1.Webhooks.ifttt_event
+POST        /ifttt/v1/webhook/custom_salesforce_trigger                                        controllers.ifttt.v1.Webhooks.customSalesforceTrigger
+
+POST        /ifttt/v1/actions/post_on_chatter                                                  controllers.ifttt.v1.Actions.postOnChatter
