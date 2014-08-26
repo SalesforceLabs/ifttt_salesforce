@@ -126,9 +126,6 @@ object Triggers extends Controller {
 
             val instanceUrl = ForceUtils.instanceUrl(userinfoResponse.json)
 
-            // add the user to the watchers in this org in order to support real-time notifications
-            Global.redis.sadd(orgId, userId)
-
             val query = s"""
                 |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c, ifttt__Related_Object_Type__c, ifttt__Related_Object_Id__c
                 |FROM ifttt__IFTTT_Event__c
@@ -213,9 +210,6 @@ object Triggers extends Controller {
               val userId = (userinfoResponse.json \ "user_id").as[String]
 
               val orgId = (userinfoResponse.json \ "organization_id").as[String]
-
-              // add the user to the watchers in this org in order to support real-time notifications
-              Global.redis.sadd(orgId, userId)
 
               val whereStatement = if (eventType != "") {
                 s"WHERE ifttt__Type__c = '$eventType'"

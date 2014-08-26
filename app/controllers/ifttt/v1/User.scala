@@ -6,7 +6,7 @@ import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.json.Reads._
 import play.api.libs.functional.syntax._
-import utils.ForceUtils
+import utils.{Global, ForceUtils}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -20,15 +20,22 @@ object User extends Controller {
           withHeaders(AUTHORIZATION -> auth).
           get()
 
-        userinfoFuture.map { response =>
-          response.status match {
+        userinfoFuture.map { userinfoResponse =>
+          userinfoResponse.status match {
             case OK =>
 
               val authToken = auth.stripPrefix("Bearer ")
 
-              val instanceUrl = ForceUtils.instanceUrl(response.json)
+              val instanceUrl = ForceUtils.instanceUrl(userinfoResponse.json)
 
-              val jsonResult = response.json.transform {
+              val userId = (userinfoResponse.json \ "user_id").as[String]
+
+              val orgId = (userinfoResponse.json \ "organization_id").as[String]
+
+              // add the user to the watchers in this org in order to support real-time notifications
+              Global.redis.sadd(orgId, userId)
+
+              val jsonResult = userinfoResponse.json.transform {
                 val reads = {
                   (__ \ 'data \ 'id).json.copyFrom((__ \ 'user_id).json.pick) and
                     (__ \ 'data \ 'name).json.copyFrom((__ \ 'name).json.pick) and
@@ -47,14 +54,14 @@ object User extends Controller {
               val json = Json.obj(
                 "errors" -> Json.arr(
                   Json.obj(
-                    "status" -> response.body,
-                    "message" -> ("Authentication failed: " + response.body)
+                    "status" -> userinfoResponse.body,
+                    "message" -> ("Authentication failed: " + userinfoResponse.body)
                   )
                 )
               )
               Unauthorized(json)
             case _ =>
-              Status(response.status)(response.body)
+              Status(userinfoResponse.status)(userinfoResponse.body)
           }
 
         }
