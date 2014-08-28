@@ -10,5 +10,7 @@ resolvers += "rediscala" at "http://dl.bintray.com/etaty/maven"
 
 libraryDependencies ++= Seq(
   ws,
-  "com.etaty.rediscala" %% "rediscala" % "1.3.1"
+  "com.etaty.rediscala" %% "rediscala" % "1.3.1",
+  "org.webjars" %% "webjars-play" % "2.3.0",
+  "org.webjars" % "bootstrap" % "3.2.0"
 )

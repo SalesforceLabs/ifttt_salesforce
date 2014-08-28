@@ -48,7 +48,8 @@ object ForceUtils {
             map((_, Some(instanceUrl)))
 
         case Status.FORBIDDEN =>
-          Future.successful(response, None)
+          val n: Option[String] = None
+          Future.successful(response, n)
       }
     }
   }

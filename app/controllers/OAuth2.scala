@@ -21,16 +21,21 @@ object OAuth2 extends Controller {
   This is the first page that is rendered in the oauth flow.  From here the user needs to select either prod or sandbox.
    */
   def authorize = Action { request =>
-    val qsMap = request.queryString - "scope"
-    val qsMapWithRedir = qsMap.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure =  true)(request)))
-    import java.net.URLEncoder
-    val qs = Option(qsMapWithRedir).filterNot(_.isEmpty).map { params =>
-      params.toSeq.flatMap { pair =>
-        pair._2.map(value => pair._1 + "=" + URLEncoder.encode(value, "utf-8"))
-      }.mkString("&")
-    }.getOrElse("")
+    if (request.queryString.contains("client_id") && request.queryString.contains("response_type") && request.queryString.contains("state")) {
+      val qsMap = request.queryString - "scope"
+      val qsMapWithRedir = qsMap.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure =  true)(request)))
+      import java.net.URLEncoder
+      val qs = Option(qsMapWithRedir).filterNot(_.isEmpty).map { params =>
+        params.toSeq.flatMap { pair =>
+          pair._2.map(value => pair._1 + "=" + URLEncoder.encode(value, "utf-8"))
+        }.mkString("&")
+      }.getOrElse("")
 
-    Ok(views.html.authorize(qs))
+      Ok(views.html.authorize(qs))
+    }
+    else {
+      Redirect(routes.Application.index())
+    }
   }
 
   /*
@@ -51,9 +56,7 @@ object OAuth2 extends Controller {
     Redirect("https://test.salesforce.com/services/oauth2/authorize", request.queryString).withSession(ForceUtils.SALESFORCE_ENV -> ForceUtils.ENV_SANDBOX)
   }
 
-  /*
-  Step 3 - User logs in and authorizes the app on salesforce
-   */
+  // Step 3 - User logs in and authorizes the app on salesforce
 
   /*
   Step 4
