@@ -20,6 +20,8 @@ object Global extends GlobalSettings {
 
   lazy val ifffChannelKey = Play.current.configuration.getString("ifttt.channel.key").get
 
+  lazy val ifffChannelId = Play.current.configuration.getString("ifttt.channel.id").get
+
   override def onStart(app: Application): Unit = {
     redis.ping()
     super.onStart(app)

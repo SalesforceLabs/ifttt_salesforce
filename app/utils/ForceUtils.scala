@@ -1,5 +1,6 @@
 package utils
 
+import org.apache.commons.codec.digest.DigestUtils
 import play.api.http.{Status, HeaderNames}
 import play.api.libs.json.JsValue
 import play.api.libs.ws.{WSResponse, WS}
@@ -11,11 +12,25 @@ object ForceUtils {
 
   val API_VERSION = "30.0"
 
-  def userinfo(auth: String) = {
-    WS.
-      url("https://login.salesforce.com/services/oauth2/userinfo").
-      withHeaders(HeaderNames.AUTHORIZATION -> auth).
-      get()
+  val ENV_PROD = "prod"
+  val ENV_SANDBOX = "sandbox"
+  val SALESFORCE_ENV = "salesforce-env"
+
+  def userinfo(auth: String): Future[WSResponse] = {
+    Global.redis.get[String](DigestUtils.sha1Hex(auth)).flatMap { maybeEnv =>
+      val env = maybeEnv.getOrElse(ENV_PROD)
+      WS.url(userinfoUrl(env)).withHeaders(HeaderNames.AUTHORIZATION -> auth).get()
+    }
+  }
+
+  def loginUrl(env: String) = env match {
+    case ENV_PROD => "https://login.salesforce.com/services/oauth2/token"
+    case ENV_SANDBOX => "https://test.salesforce.com/services/oauth2/token"
+  }
+
+  def userinfoUrl(env: String) = env match {
+    case ENV_PROD => "https://login.salesforce.com/services/oauth2/userinfo"
+    case ENV_SANDBOX => "https://test.salesforce.com/services/oauth2/userinfo"
   }
 
   def chatterPost(auth: String, message: String): Future[(WSResponse, Option[String])] = {

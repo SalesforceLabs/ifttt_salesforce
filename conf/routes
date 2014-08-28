@@ -1,4 +1,7 @@
 GET         /services/oauth2/authorize                                                         controllers.OAuth2.authorize
+GET         /services/oauth2/authorize-prod                                                    controllers.OAuth2.authorizeProd
+GET         /services/oauth2/authorize-sandbox                                                 controllers.OAuth2.authorizeSandbox
+GET         /services/oauth2/authorized                                                        controllers.OAuth2.authorized
 
 POST        /services/oauth2/token                                                             controllers.OAuth2.token
 

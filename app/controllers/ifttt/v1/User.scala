@@ -15,10 +15,7 @@ object User extends Controller {
   def info = Action.async { implicit request =>
     request.headers.get(AUTHORIZATION) match {
       case Some(auth) =>
-        val userinfoFuture = WS.
-          url("https://login.salesforce.com/services/oauth2/userinfo").
-          withHeaders(AUTHORIZATION -> auth).
-          get()
+        val userinfoFuture = ForceUtils.userinfo(auth)
 
         userinfoFuture.map { userinfoResponse =>
           userinfoResponse.status match {

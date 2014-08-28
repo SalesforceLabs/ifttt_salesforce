@@ -1,0 +1,11 @@
+@(qs: String)
+<!DOCTYPE html>
+<html>
+    <head>
+
+    </head>
+    <body>
+        <a href="@routes.OAuth2.authorizeProd()?@qs">Production & Developer Org</a><br/>
+        <a href="@routes.OAuth2.authorizeSandbox()?@qs">Sandbox Org</a>
+    </body>
+</html>
