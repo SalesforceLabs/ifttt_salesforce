@@ -3,6 +3,7 @@ package controllers.ifttt.v1
 import java.text.NumberFormat
 import java.util.Date
 
+import play.api.Logger
 import play.api.libs.ws.WS
 import play.api.mvc.{Controller, Action}
 import play.api.Play.current
@@ -250,6 +251,7 @@ object Triggers extends Controller {
               )
               Future.successful(Unauthorized(json))
             case _ =>
+              Logger.info(userinfoResponse.body)
               Future.successful(Status(userinfoResponse.status)(userinfoResponse.body))
           }
         }
