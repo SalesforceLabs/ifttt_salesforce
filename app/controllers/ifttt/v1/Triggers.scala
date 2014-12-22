@@ -339,49 +339,6 @@ object Triggers extends Controller {
 
   }
 
-  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = Action.async(parse.json) { request =>
-
-      request.headers.get(AUTHORIZATION).map { auth =>
-
-        ForceUtils.userinfo(auth).flatMap { userinfoResponse =>
-
-          userinfoResponse.status match {
-            case OK =>
-              val url = ForceUtils.sobjectsUrl(userinfoResponse.json)
-
-              val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).get()
-
-              queryRequest.map { queryResponse =>
-
-                val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
-
-                // todo: use a JSON transformer
-                val options = sobjects.filter(_.\("queryable").as[Boolean]).map { json =>
-                    Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
-                }
-
-                Ok(
-                  Json.obj(
-                    "data" -> options
-                  )
-                )
-              }
-            case FORBIDDEN =>
-              val json = Json.obj(
-                "errors" -> Json.arr(
-                  Json.obj(
-                    "status" -> userinfoResponse.body,
-                    "message" -> ("Authentication failed: " + userinfoResponse.body)
-                  )
-                )
-              )
-              Future.successful(Unauthorized(json))
-            case _ =>
-              Future.successful(Status(userinfoResponse.status)(userinfoResponse.body))
-          }
-        }
-
-      } getOrElse Future.successful(Unauthorized)
-  }
+  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = ForceUtils.sobjectOptions()
 
 }

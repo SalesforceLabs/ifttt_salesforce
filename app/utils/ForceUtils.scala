@@ -2,9 +2,10 @@ package utils
 
 import org.apache.commons.codec.digest.DigestUtils
 import play.api.http.{Status, HeaderNames}
-import play.api.libs.json.JsValue
+import play.api.libs.json.{Json, JsObject, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
+import play.api.mvc._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -53,6 +54,69 @@ object ForceUtils {
       }
     }
   }
+
+  def insert(auth: String, sobject: String, json: JsValue): Future[WSResponse] = {
+    userinfo(auth).flatMap { response =>
+
+      response.status match {
+        case Status.OK =>
+          WS.
+            url(sobjectsUrl(response.json) + sobject).
+            withHeaders(HeaderNames.AUTHORIZATION -> auth).
+            post(json)
+
+        case Status.FORBIDDEN =>
+          Future.successful(response)
+      }
+    }
+
+  }
+
+  def sobjectOptions(): Action[JsValue] = Action.async(BodyParsers.parse.json) { request =>
+
+    request.headers.get(HeaderNames.AUTHORIZATION).map { auth =>
+
+      ForceUtils.userinfo(auth).flatMap { userinfoResponse =>
+
+        userinfoResponse.status match {
+          case Status.OK =>
+            val url = ForceUtils.sobjectsUrl(userinfoResponse.json)
+
+            val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> auth).get()
+
+            queryRequest.map { queryResponse =>
+
+              val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
+
+              // todo: use a JSON transformer
+              val options = sobjects.filter(_.\("queryable").as[Boolean]).map { json =>
+                Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
+              }
+
+              Results.Ok(
+                Json.obj(
+                  "data" -> options
+                )
+              )
+            }
+          case Status.FORBIDDEN =>
+            val json = Json.obj(
+              "errors" -> Json.arr(
+                Json.obj(
+                  "status" -> userinfoResponse.body,
+                  "message" -> ("Authentication failed: " + userinfoResponse.body)
+                )
+              )
+            )
+            Future.successful(Results.Unauthorized(json))
+          case _ =>
+            Future.successful(Results.Status(userinfoResponse.status)(userinfoResponse.body))
+        }
+      }
+
+    } getOrElse Future.successful(Results.Unauthorized(""))
+  }
+
 
   def queryUrl(value: JsValue) = (value \ "urls" \ "query").as[String].replace("{version}", API_VERSION)
 

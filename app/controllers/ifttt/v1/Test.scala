@@ -29,6 +29,10 @@ object Test {
             "actions" -> Json.obj(
               "post_on_chatter" -> Json.obj(
                 "message" -> "A test message"
+              ),
+              "insert_a_record" -> Json.obj(
+                "sobject" -> "Contact",
+                "json_to_insert" -> """{"LastName": "Foo"}"""
               )
             )
           )
