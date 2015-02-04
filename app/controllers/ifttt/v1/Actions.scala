@@ -6,6 +6,7 @@ import utils.ForceUtils
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
 
 object Actions extends Controller {
 
@@ -48,7 +49,9 @@ object Actions extends Controller {
     request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
 
       val maybeSobject = (request.body \ "actionFields" \ "sobject").asOpt[String]
-      val maybeJsonToInsert = (request.body \ "actionFields" \ "json_to_insert").asOpt[String].map(Json.parse)
+      val maybeJsonToInsert = (request.body \ "actionFields" \ "json_to_insert").asOpt[String].flatMap { json =>
+        Try(Json.parse(json)).toOption
+      }
 
       val maybeSobjectAndJson: Option[(String, JsValue)] = for {
         sobject <- maybeSobject
