@@ -135,7 +135,14 @@ object Triggers extends Controller {
                 |LIMIT $limit
               """.stripMargin
 
-            val queryRequest = WS.url(queryUrl).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
+            val queryRequest = WS.url(queryUrl).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get().flatMap { response =>
+              response.status match {
+                case OK =>
+                  Future.successful(response)
+                case _ =>
+                  Future.failed(new Exception(response.body))
+              }
+            }
 
             queryRequest.flatMap { queryResponse =>
 
@@ -163,6 +170,10 @@ object Triggers extends Controller {
                 }
 
               }
+            } recover {
+              case e: Exception =>
+                // most likely the user didn't have the IFTTT Salesforce package installed.
+                InternalServerError(Json.obj("error" -> e.getMessage))
             }
           case FORBIDDEN =>
             val json = Json.obj(
@@ -227,7 +238,14 @@ object Triggers extends Controller {
                 |LIMIT $limit
               """.stripMargin
 
-              val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
+              val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get().flatMap { response =>
+                response.status match {
+                  case OK =>
+                    Future.successful(response)
+                  case _ =>
+                    Future.failed(new Exception(response.body))
+                }
+              }
 
               queryRequest.map { queryResponse =>
 
@@ -239,6 +257,10 @@ object Triggers extends Controller {
                   case JsError(error) =>
                     InternalServerError(Json.obj("error" -> error.toString))
                 }
+              } recover {
+                case e: Exception =>
+                  // most likely the user didn't have the IFTTT Salesforce package installed.
+                  InternalServerError(Json.obj("error" -> e.getMessage))
               }
             case FORBIDDEN =>
               val json = Json.obj(
