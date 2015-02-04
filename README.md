@@ -40,3 +40,7 @@ To setup a local development environment do the following:
 1. Run the IFTTT Channel Activation Test
 1. Setup the IFTTT Triggers and Actions
     * TODO
+1. Setup sample data on Salesforce for IFTTT tests
+    * Create 3 new Opportunities with a `Closed/Won` status
+    * Create 3 new `IFTTT Events` objects with the `type` field set to `test`
+1. Run the IFTTT Channel Endpoint Test
