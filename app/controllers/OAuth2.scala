@@ -2,7 +2,7 @@ package controllers
 
 import org.apache.commons.codec.digest.DigestUtils
 import play.api.libs.ws.WS
-import play.api.mvc.{Request, RequestHeader, Action, Controller}
+import play.api.mvc.{Request, Action, Controller}
 import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.json.Reads._
@@ -124,10 +124,9 @@ object OAuth2 extends Controller {
     Global.redis.get[String](DigestUtils.sha1Hex(code)).flatMap { maybeEnv =>
       val env = maybeEnv.getOrElse(ForceUtils.ENV_PROD)
 
-      val requestHeaders = request.headers.toSimpleMap.toSeq
       val bodyWithRedir = request.body.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure =  true)(request)))
 
-      val tokenFuture = WS.url(ForceUtils.loginUrl(env)).withHeaders(requestHeaders: _*).post(bodyWithRedir)
+      val tokenFuture = WS.url(ForceUtils.loginUrl(env)).post(bodyWithRedir)
 
       tokenFuture.flatMap { response =>
         val newRefreshToken = (response.json \ "refresh_token").as[String]
