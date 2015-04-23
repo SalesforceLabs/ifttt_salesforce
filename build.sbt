@@ -14,3 +14,11 @@ libraryDependencies ++= Seq(
   "org.webjars" %% "webjars-play" % "2.3.0",
   "org.webjars" % "bootstrap" % "3.2.0"
 )
+
+enablePlugins(ForcePlugin)
+
+username in Force := sys.env("SALESFORCE_USERNAME")
+
+password in Force := sys.env("SALESFORCE_PASSWORD")
+
+packagedComponents in Force := Seq("com.salesforce.ifttt")

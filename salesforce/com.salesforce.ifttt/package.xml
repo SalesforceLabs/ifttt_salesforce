@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>com%2Esalesforce%2Eifttt</fullName>
+    <apiAccessLevel>Unrestricted</apiAccessLevel>
+    <namespacePrefix>ifttt</namespacePrefix>
+    <types>
+        <members>IFTTTEventTriggerTest</members>
+        <members>IFTTTOpportunityWonTriggerTest</members>
+        <members>Webhook</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>IFTTT_Setup</members>
+        <name>ApexPage</name>
+    </types>
+    <types>
+        <members>IFTTTEventTrigger</members>
+        <members>IFTTTOpportunityWonTrigger</members>
+        <name>ApexTrigger</name>
+    </types>
+    <types>
+        <members>IFTTT_Event__c.Message__c</members>
+        <members>IFTTT_Event__c.Related_Object_Id__c</members>
+        <members>IFTTT_Event__c.Related_Object_Type__c</members>
+        <members>IFTTT_Event__c.Type__c</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>IFTTT_Event__c</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>IFTTT_Salesforce</members>
+        <name>CustomTab</name>
+    </types>
+    <types>
+        <members>IFTTT_Event__c-IFTTT Event Layout</members>
+        <name>Layout</name>
+    </types>
+    <types>
+        <members>IFTTT_Salesforce</members>
+        <name>RemoteSiteSetting</name>
+    </types>
+    <version>29.0</version>
+</Package>

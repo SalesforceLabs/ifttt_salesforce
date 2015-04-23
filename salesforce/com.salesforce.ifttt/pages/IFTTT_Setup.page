@@ -1,0 +1,19 @@
+<apex:page >
+
+    <apex:pageBlock title="IFTTT Salesforce Channel">
+        The <a href="https://ifttt.com/salesforce">Salesforce IFTTT Channel</a> connects Salesforce to the many different devices and services on <a href="http://ifttt.com">IFTTT</a> using simple recipies that are defined in the "If this then that" form. 
+    
+    
+        There are currently three types of "if this" events you can use in your IFTTT recipies:
+        <ul>
+            <li><strong>Custom Salesforce Trigger</strong> - This Trigger fires every time a new record is added to IFTTT Events on Salesforce.</li>
+            <li><strong>Record Created or Updated Trigger</strong> - This Trigger fires within 15 minutes of a record being created or updated on the specified object in Salesforce.</li>
+            <li><strong>Opportunity was Won</strong> - This Trigger fires every time an Opportunity changes to the "Closed Won" stage.</li>
+        </ul>
+    </apex:pageBlock>
+
+    <apex:pageBlock title="IFTTT Events for the Custom Salesforce IFTTT Trigger">
+        <apex:ListViews type="IFTTT_Event__c"/>
+    </apex:pageBlock>
+    
+</apex:page>
