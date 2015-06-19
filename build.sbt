@@ -17,8 +17,8 @@ libraryDependencies ++= Seq(
 
 enablePlugins(ForcePlugin)
 
-username in Force := sys.env("SALESFORCE_USERNAME")
+username in Force := sys.env.get("SALESFORCE_USERNAME").getOrElse("")
 
-password in Force := sys.env("SALESFORCE_PASSWORD")
+password in Force := sys.env.get("SALESFORCE_PASSWORD").getOrElse("")
 
 packagedComponents in Force := Seq("com.salesforce.ifttt")
