@@ -106,15 +106,13 @@ object OAuth2 extends Controller {
       val tokenFuture = WS.url(ForceUtils.loginUrl(env)).post(request.body)
 
       tokenFuture.flatMap { response =>
-        val accessToken = "Bearer " + (response.json \ "access_token").as[String] // add the Bearer prefix since that is how we will retrieve it
-
-        Global.redis.set(DigestUtils.sha1Hex(refreshToken), env).map { _ =>
-          // adding the refresh token back into the json because ifttt needs it
-          val jsonResult = response.json.transform {
-            // todo: find a cleaner way to add a value to the json
-            __.json.update(__.read[JsObject].map(_ ++ Json.obj("refresh_token" -> refreshToken)))
+        (response.json \ "access_token").asOpt[String].fold {
+          Future.failed[JsValue](new Exception("Could not retrieve the access token"))
+        } { accessToken =>
+          Global.redis.set(DigestUtils.sha1Hex(s"Bearer $accessToken"), env).map { _ =>
+            // adding the refresh token back into the json because ifttt needs it
+            response.json.as[JsObject] + ("refresh_token" -> JsString(refreshToken))
           }
-          jsonResult.get
         }
       }
     }
@@ -129,13 +127,20 @@ object OAuth2 extends Controller {
       val tokenFuture = WS.url(ForceUtils.loginUrl(env)).post(bodyWithRedir)
 
       tokenFuture.flatMap { response =>
-        val newRefreshToken = (response.json \ "refresh_token").as[String]
-        val accessToken = "Bearer " + (response.json \ "access_token").as[String] // add the Bearer prefix since that is how we will retrieve it
 
-        // store the hash of the refresh token with the env in redis
-        Global.redis.set(DigestUtils.sha1Hex(newRefreshToken), env).flatMap { _ =>
-          // store the hash of the access token with the env in redis
-          Global.redis.set(DigestUtils.sha1Hex(accessToken), env).map(_ => response.json)
+        val maybeRefreshAccessTokens = for {
+          refreshToken <- (response.json \ "refresh_token").asOpt[String]
+          accessToken <- (response.json \ "access_token").asOpt[String]
+        } yield (refreshToken, accessToken)
+
+        maybeRefreshAccessTokens.fold {
+          Future.failed[JsValue](new Exception("Could not retrieve refresh and access tokens"))
+        } { case (refreshToken, accessToken) =>
+          // store the hash of the refresh token with the env in redis
+          Global.redis.set(DigestUtils.sha1Hex(refreshToken), env).flatMap { _ =>
+            // store the hash of the access token with the env in redis
+            Global.redis.set(DigestUtils.sha1Hex(s"Bearer $accessToken"), env).map(_ => response.json)
+          }
         }
       }
     }
