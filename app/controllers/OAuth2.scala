@@ -89,11 +89,15 @@ object OAuth2 extends Controller {
 
     (maybeRefreshToken, maybeCode) match {
       case (Some(refreshToken), _) =>
-      // auth with refresh token
-        tokenRefresh(request, refreshToken).map(Ok(_))
+        // auth with refresh token
+        tokenRefresh(request, refreshToken).map(Ok(_)).recover { case e: Exception =>
+          InternalServerError(e.getMessage)
+        }
       case (_, Some(code)) =>
-      // auth with code
-        tokenCode(request, code).map(Ok(_))
+        // auth with code
+        tokenCode(request, code).map(Ok(_)).recover { case e: Exception =>
+          InternalServerError(e.getMessage)
+        }
       case _ =>
         Future.successful(BadRequest("auth with either a code or a refresh_token"))
     }
@@ -107,7 +111,7 @@ object OAuth2 extends Controller {
 
       tokenFuture.flatMap { response =>
         (response.json \ "access_token").asOpt[String].fold {
-          Future.failed[JsValue](new Exception("Could not retrieve the access token"))
+          Future.failed[JsValue](new Exception("Could not retrieve the access token: " + response.body))
         } { accessToken =>
           Global.redis.set(DigestUtils.sha1Hex(s"Bearer $accessToken"), env).map { _ =>
             // adding the refresh token back into the json because ifttt needs it
