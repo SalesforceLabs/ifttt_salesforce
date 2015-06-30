@@ -361,6 +361,6 @@ object Triggers extends Controller {
 
   }
 
-  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = ForceUtils.sobjectOptions()
+  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = ForceUtils.sobjectOptions("queryable")
 
 }

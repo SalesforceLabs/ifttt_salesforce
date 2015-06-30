@@ -85,7 +85,7 @@ object Actions extends Controller {
     }
   }
 
-  def insertARecordFieldsSObjectOptions() = ForceUtils.sobjectOptions()
+  def insertARecordFieldsSObjectOptions() = ForceUtils.sobjectOptions("createable")
 
   private def error(status: String, message: String): JsObject = {
     Json.obj(

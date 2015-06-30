@@ -72,7 +72,7 @@ object ForceUtils {
 
   }
 
-  def sobjectOptions(): Action[JsValue] = Action.async(BodyParsers.parse.json) { request =>
+  def sobjectOptions(filter: String): Action[JsValue] = Action.async(BodyParsers.parse.json) { request =>
 
     request.headers.get(HeaderNames.AUTHORIZATION).map { auth =>
 
@@ -89,9 +89,9 @@ object ForceUtils {
               val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
 
               // todo: use a JSON transformer
-              val options = sobjects.filter(_.\("queryable").as[Boolean]).map { json =>
+              val options = sobjects.filter(_.\(filter).as[Boolean]).map { json =>
                 Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
-              }
+              } sortBy (_.\("label").as[String])
 
               Results.Ok(
                 Json.obj(
