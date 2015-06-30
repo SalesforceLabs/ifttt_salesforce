@@ -125,6 +125,10 @@ object OAuth2 extends Controller {
             }
           case UNAUTHORIZED =>
             Future.failed(LoginException(response.body))
+          case BAD_REQUEST =>
+            Future.failed(LoginException((response.json \ "error_description").as[String]))
+          case _ =>
+            Future.failed(new Exception(response.body))
         }
       }
     }
