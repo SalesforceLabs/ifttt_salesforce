@@ -2,7 +2,7 @@ package controllers
 
 import org.apache.commons.codec.digest.DigestUtils
 import play.api.libs.ws.WS
-import play.api.mvc.{Request, Action, Controller}
+import play.api.mvc.{Result, Request, Action, Controller}
 import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.json.Reads._
@@ -87,17 +87,20 @@ object OAuth2 extends Controller {
     val maybeRefreshToken = request.body.get("refresh_token").flatMap(_.headOption)
     val maybeCode = request.body.get("code").flatMap(_.headOption)
 
+    val handleError: PartialFunction[Throwable, Result] = {
+      case le: LoginException =>
+        Unauthorized(le.message)
+      case e: Exception =>
+        InternalServerError(e.getMessage)
+    }
+
     (maybeRefreshToken, maybeCode) match {
       case (Some(refreshToken), _) =>
         // auth with refresh token
-        tokenRefresh(request, refreshToken).map(Ok(_)).recover { case e: Exception =>
-          InternalServerError(e.getMessage)
-        }
+        tokenRefresh(request, refreshToken).map(Ok(_)).recover(handleError)
       case (_, Some(code)) =>
         // auth with code
-        tokenCode(request, code).map(Ok(_)).recover { case e: Exception =>
-          InternalServerError(e.getMessage)
-        }
+        tokenCode(request, code).map(Ok(_)).recover(handleError)
       case _ =>
         Future.successful(BadRequest("auth with either a code or a refresh_token"))
     }
@@ -110,13 +113,18 @@ object OAuth2 extends Controller {
       val tokenFuture = WS.url(ForceUtils.loginUrl(env)).post(request.body)
 
       tokenFuture.flatMap { response =>
-        (response.json \ "access_token").asOpt[String].fold {
-          Future.failed[JsValue](new Exception("Could not retrieve the access token: " + response.body))
-        } { accessToken =>
-          Global.redis.set(DigestUtils.sha1Hex(s"Bearer $accessToken"), env).map { _ =>
-            // adding the refresh token back into the json because ifttt needs it
-            response.json.as[JsObject] + ("refresh_token" -> JsString(refreshToken))
-          }
+        response.status match {
+          case OK =>
+            (response.json \ "access_token").asOpt[String].fold {
+              Future.failed[JsValue](LoginException("Could not retrieve the access token: " + response.body))
+            } { accessToken =>
+              Global.redis.set(DigestUtils.sha1Hex(s"Bearer $accessToken"), env).map { _ =>
+                // adding the refresh token back into the json because ifttt needs it
+                response.json.as[JsObject] + ("refresh_token" -> JsString(refreshToken))
+              }
+            }
+          case UNAUTHORIZED =>
+            Future.failed(LoginException(response.body))
         }
       }
     }
@@ -138,7 +146,7 @@ object OAuth2 extends Controller {
         } yield (refreshToken, accessToken)
 
         maybeRefreshAccessTokens.fold {
-          Future.failed[JsValue](new Exception("Could not retrieve refresh and access tokens"))
+          Future.failed[JsValue](LoginException("Could not retrieve refresh and access tokens"))
         } { case (refreshToken, accessToken) =>
           // store the hash of the refresh token with the env in redis
           Global.redis.set(DigestUtils.sha1Hex(refreshToken), env).flatMap { _ =>
@@ -148,6 +156,10 @@ object OAuth2 extends Controller {
         }
       }
     }
+  }
+
+  case class LoginException(message: String) extends Exception {
+    override def getMessage: String = message
   }
 
 }
