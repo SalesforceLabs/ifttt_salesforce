@@ -49,18 +49,18 @@ object Actions extends Controller {
     request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
 
       val maybeSobject = (request.body \ "actionFields" \ "sobject").asOpt[String]
-      val maybeJsonToInsert = (request.body \ "actionFields" \ "json_to_insert").asOpt[String].flatMap { json =>
-        Try(Json.parse(json)).toOption
+
+      def maybeNameValue(num: Int): Option[(String, JsValue)] = {
+        (request.body \ "actionFields" \ s"field_name_$num").asOpt[String].map { fieldName1 =>
+          fieldName1 -> request.body \ "actionFields" \ s"field_value_$num"
+        }
       }
 
-      val maybeSobjectAndJson: Option[(String, JsValue)] = for {
-        sobject <- maybeSobject
-        json <- maybeJsonToInsert
-      } yield (sobject, json)
+      val jsonToInsert = JsObject((1 to 5).flatMap(maybeNameValue))
 
-      maybeSobjectAndJson.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "A field was missing")))) { case (sobject, json) =>
+      maybeSobject.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "The sobject actionField is required")))) { sobject =>
 
-        ForceUtils.insert(auth, sobject, json).map {
+        ForceUtils.insert(auth, sobject, jsonToInsert).map {
           case response if response.status == CREATED =>
 
             val id = (response.json \ "id").as[String]

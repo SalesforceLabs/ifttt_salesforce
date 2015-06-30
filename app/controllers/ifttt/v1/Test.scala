@@ -32,7 +32,16 @@ object Test {
               ),
               "insert_a_record" -> Json.obj(
                 "sobject" -> "Contact",
-                "json_to_insert" -> """{"LastName": "Foo"}"""
+                "field_name_1" -> "FirstName",
+                "field_value_1" -> "Foo",
+                "field_name_2" -> "LastName",
+                "field_value_2" -> "Bar",
+                "field_name_3" -> "Email",
+                "field_value_3" -> "foo@bar.com",
+                "field_name_4" -> "Phone",
+                "field_value_4" -> "303-555-1212",
+                "field_name_5" -> "Title",
+                "field_value_5" -> "Chief"
               )
             )
           )
