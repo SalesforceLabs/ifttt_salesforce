@@ -51,14 +51,14 @@ object Actions extends Controller {
       val maybeSobject = (request.body \ "actionFields" \ "sobject").asOpt[String]
 
       def maybeNameValue(num: Int): Option[(String, JsValue)] = {
-        (request.body \ "actionFields" \ s"field_name_$num").asOpt[String].map { fieldName1 =>
-          fieldName1 -> request.body \ "actionFields" \ s"field_value_$num"
+        (request.body \ "actionFields" \ s"field_name_$num").asOpt[String].filter(_.length > 0).map { fieldName =>
+          fieldName -> request.body \ "actionFields" \ s"field_value_$num"
         }
       }
 
       val jsonToInsert = JsObject((1 to 5).flatMap(maybeNameValue))
 
-      maybeSobject.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "The sobject actionField is required")))) { sobject =>
+      maybeSobject.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "An SObject must be specified")))) { sobject =>
 
         ForceUtils.insert(auth, sobject, jsonToInsert).map {
           case response if response.status == CREATED =>
