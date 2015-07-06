@@ -1,8 +1,8 @@
 package controllers.ifttt.v1
 
 import java.text.NumberFormat
-import java.util.Date
 
+import org.joda.time.DateTime
 import play.api.Logger
 import play.api.libs.ws.WS
 import play.api.mvc.{Controller, Action}
@@ -10,12 +10,15 @@ import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.json.Reads._
 import play.api.libs.functional.syntax._
-import utils.{Global, ForceUtils}
+import utils.ForceUtils
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
 
 object Triggers extends Controller {
+
+  // 2015-07-06T19:07:56.000+0000
+  val jodaDateTimeReads = jodaDateReads("yyyy-MM-dd'T'HH:mm:ss.SSSZZ")
 
   // todo: I'm sure there is a much better way to compose these JSON transformers
 
@@ -26,7 +29,7 @@ object Triggers extends Controller {
           val newArr = arr.map {
             case j: JsObject =>
               val id = (j \ "Id").as[String]
-              val timestamp = (j \ "LastModifiedDate").as[Date]
+              val timestamp = (j \ "LastModifiedDate").as[DateTime](jodaDateTimeReads)
               val name = (j \ "Name").as[String]
               val oppId = (j \ "ifttt__Related_Object_Id__c").as[String]
 
@@ -39,7 +42,7 @@ object Triggers extends Controller {
                 "link_to_opportunity" -> (instanceUrl + oppId),
                 "meta" -> Json.obj(
                   "id" -> id,
-                  "timestamp" -> timestamp.getTime / 1000
+                  "timestamp" -> timestamp.getMillis / 1000
                 )
               )
             case _ =>
@@ -57,7 +60,7 @@ object Triggers extends Controller {
           val newArr = arr.map {
             case j: JsObject =>
               val id = (j \ "Id").as[String]
-              val timestamp = (j \ "LastModifiedDate").as[Date]
+              val timestamp = (j \ "LastModifiedDate").as[DateTime](jodaDateTimeReads)
               val subject = (j \ "Name").as[String]
               val eventType = (j \ "ifttt__Type__c").asOpt[String].getOrElse("")
               val message = (j \ "ifttt__Message__c").asOpt[String].getOrElse("")
@@ -68,7 +71,7 @@ object Triggers extends Controller {
                 "message" -> message,
                 "meta" -> Json.obj(
                   "id" -> id,
-                  "timestamp" -> timestamp.getTime / 1000
+                  "timestamp" -> timestamp.getMillis / 1000
                 )
               )
             case _ =>
@@ -86,14 +89,14 @@ object Triggers extends Controller {
           val newArr = arr.map {
             case j: JsObject =>
               val id = (j \ "Id").as[String]
-              val timestamp = (j \ "LastModifiedDate").as[Date]
+              val timestamp = (j \ "LastModifiedDate").as[DateTime](jodaDateTimeReads)
               val linkToRecord = instanceUrl + id
 
               Json.obj(
                 "link_to_record" -> linkToRecord,
                 "meta" -> Json.obj(
                   "id" -> id,
-                  "timestamp" -> timestamp.getTime / 1000
+                  "timestamp" -> timestamp.getMillis / 1000
                 )
               )
             case _ =>
