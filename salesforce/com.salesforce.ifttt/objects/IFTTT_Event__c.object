@@ -95,11 +95,26 @@
         <unique>false</unique>
     </fields>
     <label>IFTTT Event</label>
+    <listViews>
+        <fullName>All_IFTTT_Events</fullName>
+        <columns>NAME</columns>
+        <columns>Type__c</columns>
+        <columns>LAST_UPDATE</columns>
+        <filterScope>Everything</filterScope>
+        <label>All IFTTT Events</label>
+    </listViews>
     <nameField>
         <label>IFTTT Event Name</label>
         <type>Text</type>
     </nameField>
     <pluralLabel>IFTTT Events</pluralLabel>
-    <searchLayouts/>
+    <searchLayouts>
+        <excludedStandardButtons>ChangeOwner</excludedStandardButtons>
+        <excludedStandardButtons>Accept</excludedStandardButtons>
+        <lookupDialogsAdditionalFields>Type__c</lookupDialogsAdditionalFields>
+        <lookupDialogsAdditionalFields>LAST_UPDATE</lookupDialogsAdditionalFields>
+        <lookupPhoneDialogsAdditionalFields>Type__c</lookupPhoneDialogsAdditionalFields>
+        <lookupPhoneDialogsAdditionalFields>LAST_UPDATE</lookupPhoneDialogsAdditionalFields>
+    </searchLayouts>
     <sharingModel>ReadWrite</sharingModel>
 </CustomObject>

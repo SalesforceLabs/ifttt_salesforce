@@ -38,6 +38,10 @@
         <name>Layout</name>
     </types>
     <types>
+        <members>IFTTT_Event__c.All_IFTTT_Events</members>
+        <name>ListView</name>
+    </types>
+    <types>
         <members>IFTTT_Salesforce</members>
         <name>RemoteSiteSetting</name>
     </types>
