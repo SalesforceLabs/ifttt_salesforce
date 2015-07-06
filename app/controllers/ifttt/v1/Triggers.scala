@@ -87,12 +87,10 @@ object Triggers extends Controller {
             case j: JsObject =>
               val id = (j \ "Id").as[String]
               val timestamp = (j \ "LastModifiedDate").as[Date]
-              val name = (j \ "Name").as[String]
               val linkToRecord = instanceUrl + id
 
               Json.obj(
                 "link_to_record" -> linkToRecord,
-                "name" -> name,
                 "meta" -> Json.obj(
                   "id" -> id,
                   "timestamp" -> timestamp.getTime / 1000
@@ -321,7 +319,7 @@ object Triggers extends Controller {
               }
 
               val query = s"""
-                |SELECT Id, Name, LastModifiedDate
+                |SELECT Id, LastModifiedDate
                 |FROM $sobject
                 |$whereStatement
                 |ORDER BY LastModifiedDate DESC
@@ -331,15 +329,22 @@ object Triggers extends Controller {
               val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
 
               queryRequest.map { queryResponse =>
+                queryResponse.status match {
+                  case OK =>
+                    val jsonResult = queryResponse.json.transform(anyQueryResultToIFTTT(instanceUrl))
 
-                val jsonResult = queryResponse.json.transform(anyQueryResultToIFTTT(instanceUrl))
-
-                jsonResult match {
-                  case JsSuccess(json, _) =>
-                    Ok(json)
-                  case JsError(error) =>
-                    InternalServerError(Json.obj("error" -> error.toString))
+                    jsonResult match {
+                      case JsSuccess(json, _) =>
+                        Ok(json)
+                      case JsError(error) =>
+                        InternalServerError(Json.obj("error" -> error.toString))
+                    }
+                  case _ =>
+                    Logger.error("recordCreatedOrUpdatedTrigger failed: " + queryResponse.body)
+                    InternalServerError(Json.obj("error" -> (queryResponse.json \\ "message").headOption.flatMap(_.asOpt[String])))
                 }
+
+
               }
             case FORBIDDEN =>
               val json = Json.obj(

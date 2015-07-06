@@ -22,8 +22,8 @@ object Test {
                 "type" -> "test"
               ),
               "record_created_or_updated_trigger" -> Json.obj(
-                "sobject" -> "Contact",
-                "query_criteria" -> "Phone != null"
+                "sobject" -> "Task",
+                "query_criteria" -> "Subject != NULL"
               )
             ),
             "actions" -> Json.obj(
