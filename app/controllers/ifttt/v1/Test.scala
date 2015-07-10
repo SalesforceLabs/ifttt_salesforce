@@ -31,17 +31,17 @@ object Test {
                 "message" -> "A test message"
               ),
               "insert_a_record" -> Json.obj(
-                "sobject" -> "Contact",
-                "field_name_1" -> "FirstName",
-                "field_value_1" -> "Foo",
-                "field_name_2" -> "LastName",
-                "field_value_2" -> "Bar",
-                "field_name_3" -> "Email",
-                "field_value_3" -> "foo@bar.com",
-                "field_name_4" -> "Phone",
-                "field_value_4" -> "303-555-1212",
-                "field_name_5" -> "Title",
-                "field_value_5" -> "Chief"
+                "sobject" -> "Event",
+                "field_name_1" -> "StartDateTime",
+                "field_value_1" -> "July 10, 2015 at 8:00AM",
+                "field_name_2" -> "EndDateTime",
+                "field_value_2" -> "July 10, 2015 at 10:00AM",
+                "field_name_3" -> "Description",
+                "field_value_3" -> "Test Event",
+                "field_name_4" -> "IsPrivate",
+                "field_value_4" -> "false",
+                "field_name_5" -> "Subject",
+                "field_value_5" -> "Call"
               )
             )
           )

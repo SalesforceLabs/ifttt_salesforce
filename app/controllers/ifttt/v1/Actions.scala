@@ -1,12 +1,12 @@
 package controllers.ifttt.v1
 
-import play.api.libs.json.{JsValue, JsString, JsObject, Json}
+import play.api.libs.json.Reads._
+import play.api.libs.json._
 import play.api.mvc.{Action, Controller}
-import utils.ForceUtils
+import utils.{Adapters, ForceUtils}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Try
 
 object Actions extends Controller {
 
@@ -52,7 +52,7 @@ object Actions extends Controller {
 
       def maybeNameValue(num: Int): Option[(String, JsValue)] = {
         (request.body \ "actionFields" \ s"field_name_$num").asOpt[String].filter(_.length > 0).map { fieldName =>
-          fieldName -> request.body \ "actionFields" \ s"field_value_$num"
+          fieldName -> Adapters.anyJsValueToSalesforce(request.body \ "actionFields" \ s"field_value_$num")
         }
       }
 
@@ -79,7 +79,7 @@ object Actions extends Controller {
             Unauthorized(error("Unauthorized", response.body))
 
           case response =>
-            Status(response.status)(response.body)
+            Status(response.status)(response.json)
         }
       }
     }
