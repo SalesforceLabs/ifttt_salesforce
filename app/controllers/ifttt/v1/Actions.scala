@@ -60,7 +60,7 @@ object Actions extends Controller {
 
       maybeSobject.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "An SObject must be specified")))) { sobject =>
 
-        ForceUtils.insert(auth, sobject, jsonToInsert).map {
+        ForceUtils.insert(auth, sobject, jsonToInsert).flatMap {
           case response if response.status == CREATED =>
 
             val id = (response.json \ "id").as[String]
@@ -73,13 +73,15 @@ object Actions extends Controller {
               )
             )
 
-            Ok(json)
+            Future.successful(Ok(json))
 
           case response if response.status == FORBIDDEN =>
-            Unauthorized(error("Unauthorized", response.body))
+            Future.successful(Unauthorized(error("Unauthorized", response.body)))
 
           case response =>
-            Status(response.status)(response.json)
+            ForceUtils.saveError(auth, response.body).map { _ =>
+              Status(response.status)(response.json)
+            }
         }
       }
     }

@@ -124,4 +124,16 @@ object ForceUtils {
 
   def instanceUrl(value: JsValue) =  (value \ "profile").as[String].stripSuffix((value \ "user_id").as[String])
 
+  def saveError(auth: String, error: String): Future[Long] = {
+    userinfo(auth).flatMap { userInfoResponse =>
+      userInfoResponse.status match {
+        case Status.OK =>
+          val userId = (userInfoResponse.json \ "user_id").as[String]
+          Global.redis.lpush(userId, error)
+        case _ =>
+          Future.failed(new Exception("Could not get user info: " + userInfoResponse.body))
+      }
+    }
+  }
+
 }

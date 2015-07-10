@@ -1,8 +1,9 @@
 package controllers
 
 import org.apache.commons.codec.digest.DigestUtils
+import play.api.Play
 import play.api.libs.ws.WS
-import play.api.mvc.{Result, Request, Action, Controller}
+import play.api.mvc._
 import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.json.Reads._
@@ -13,7 +14,8 @@ import scala.concurrent.Future
 
 object OAuth2 extends Controller {
 
-
+  lazy val salesforceOauthKey = Play.current.configuration.getString("salesforce.oauth.key").get
+  lazy val salesforceOauthSecret = Play.current.configuration.getString("salesforce.oauth.secret").get
 
   /*
   Step 1
@@ -23,7 +25,7 @@ object OAuth2 extends Controller {
   def authorize = Action { request =>
     if (request.queryString.contains("client_id") && request.queryString.contains("response_type") && request.queryString.contains("state")) {
       val qsMap = request.queryString - "scope"
-      val qsMapWithRedir = qsMap.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure =  true)(request)))
+      val qsMapWithRedir = qsMap.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure = true)(request)))
       import java.net.URLEncoder
       val qs = Option(qsMapWithRedir).filterNot(_.isEmpty).map { params =>
         params.toSeq.flatMap { pair =>
@@ -63,7 +65,7 @@ object OAuth2 extends Controller {
 
   Salesforce redirects here and we need to associate their code with the salesforce env
    */
-  def authorized() = Action { request =>
+  def authorized() = Action.async { request =>
     val maybeSalesforceEnv = request.session.get(ForceUtils.SALESFORCE_ENV)
     val maybeCode = request.queryString.get("code").flatMap(_.headOption)
 
@@ -71,11 +73,35 @@ object OAuth2 extends Controller {
       salesforceEnv <- maybeSalesforceEnv
       code <- maybeCode
     } yield {
-      Global.redis.set(DigestUtils.sha1Hex(code), salesforceEnv)
-      Redirect(s"https://ifttt.com/channels/${Global.ifffChannelId}/authorize", request.queryString)
+        request.queryString.get("state").flatMap(_.headOption).filter(_.startsWith("local-")).fold {
+          // login to ifttt
+
+          Global.redis.set(DigestUtils.sha1Hex(code), salesforceEnv)
+          Future.successful(Redirect(s"https://ifttt.com/channels/${Global.ifffChannelId}/authorize", request.queryString))
+        } { state =>
+          // login to this app
+
+          val url = state.stripPrefix("local-")
+
+          val body = Map(
+            "grant_type" -> Seq("authorization_code"),
+            "client_id" -> Seq(salesforceOauthKey),
+            "client_secret" -> Seq(salesforceOauthSecret),
+            "code" -> Seq(code)
+          )
+
+          val r = request.map(_ => body)
+          tokenCode(r, code).map { json =>
+            (json \ "access_token").asOpt[String].fold(Unauthorized("Could not login")) { accessToken =>
+              Redirect(s"/$url").flashing("access_token" -> accessToken)
+            }
+          } recover {
+            case e: Exception => InternalServerError(e.getMessage)
+          }
+        }
     }
 
-    maybeRedir.getOrElse(BadRequest("code and salesforce-env are required"))
+    maybeRedir.getOrElse(Future.successful(BadRequest("code and salesforce-env are required")))
   }
 
   /*
@@ -143,14 +169,14 @@ object OAuth2 extends Controller {
       val tokenFuture = WS.url(ForceUtils.loginUrl(env)).post(bodyWithRedir)
 
       tokenFuture.flatMap { response =>
-
         val maybeRefreshAccessTokens = for {
           refreshToken <- (response.json \ "refresh_token").asOpt[String]
           accessToken <- (response.json \ "access_token").asOpt[String]
         } yield (refreshToken, accessToken)
 
         maybeRefreshAccessTokens.fold {
-          Future.failed[JsValue](LoginException("Could not retrieve refresh and access tokens"))
+          val error = (response.json \ "error_description").asOpt[String].getOrElse("Unknown Error")
+          Future.failed[JsValue](LoginException(s"Could not retrieve refresh and access tokens: $error"))
         } { case (refreshToken, accessToken) =>
           // store the hash of the refresh token with the env in redis
           Global.redis.set(DigestUtils.sha1Hex(refreshToken), env).flatMap { _ =>

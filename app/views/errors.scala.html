@@ -1,0 +1,12 @@
+@(errors: Seq[String])
+@main("IFTTT Recipe Errors") {
+
+    <h3>Recent IFTTT Channel Errors</h3>
+
+    <ul>
+    @for(error <- errors) {
+        <li>@error</li>
+    }
+    </ul>
+
+}
