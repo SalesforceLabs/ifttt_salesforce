@@ -11,6 +11,11 @@ import scala.util.parsing.json.{JSONObject, JSONArray}
 @RunWith(classOf[JUnitRunner])
 class TriggersSpec extends Specification with JsonMatchers {
 
+  /*
+  {data : [{"name" : "asdf", "amount" : "$0", "link_to_opportunity" : "006o0000002el8xAAB", "meta" : {"id" : "006o0000002el8xAAA", "timestamp" : 1.404316532E9}}]}
+  {data : [{"name" : "asdf", "amount" : "$0",                                               "meta" : {"id" : "006o0000002el8xAAA", "timestamp" : 1404280800}}]}
+   */
+
   "Triggers" should {
     "transform salesforce records into ifttt trigger data" in {
 
@@ -21,6 +26,7 @@ class TriggersSpec extends Specification with JsonMatchers {
           |    {
           |      "attributes": {"type":"Opportunity","url":"/services/data/v30.0/sobjects/Opportunity/006o0000002el8xAAA"},
           |      "Id":"006o0000002el8xAAA",
+          |      "ifttt__Related_Object_Id__c":"006o0000002el8xAAB",
           |      "Name":"asdf",
           |      "Amount":null,
           |      "LastModifiedDate":"2014-07-02T15:55:32.000+0000"
@@ -28,9 +34,10 @@ class TriggersSpec extends Specification with JsonMatchers {
           |  ]
           |}""".stripMargin)
 
-      val actualIFTTTResponse = queryResult.transform(Triggers.opportunityQueryResultToIFTTT).asEither
+      val actualIFTTTResponse = queryResult.transform(Triggers.opportunityWonQueryResultToIFTTT("", Map.empty[String,Int])).asEither
 
       actualIFTTTResponse must beRight { json: JsObject =>
+
         json.toString must /(
           "data" -> JSONArray(
             List(
@@ -38,10 +45,11 @@ class TriggersSpec extends Specification with JsonMatchers {
                 Map(
                   "amount" -> "$0",
                   "name" -> "asdf",
+                  "link_to_opportunity" -> "006o0000002el8xAAB",
                   "meta" -> JSONObject(
                     Map(
                       "id" -> "006o0000002el8xAAA",
-                      "timestamp" -> 1404280800
+                      "timestamp" -> 1404316532D
                     )
                   )
                 )
