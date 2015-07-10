@@ -4,17 +4,12 @@ import org.junit.runner.RunWith
 import org.specs2.matcher.JsonMatchers
 import org.specs2.mutable._
 import org.specs2.runner._
-import play.api.libs.json.{JsObject, JsError, JsSuccess, Json}
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.parsing.json.{JSONObject, JSONArray}
 
 @RunWith(classOf[JUnitRunner])
 class TriggersSpec extends Specification with JsonMatchers {
-
-  /*
-  {data : [{"name" : "asdf", "amount" : "$0", "link_to_opportunity" : "006o0000002el8xAAB", "meta" : {"id" : "006o0000002el8xAAA", "timestamp" : 1.404316532E9}}]}
-  {data : [{"name" : "asdf", "amount" : "$0",                                               "meta" : {"id" : "006o0000002el8xAAA", "timestamp" : 1404280800}}]}
-   */
 
   "Triggers" should {
     "transform salesforce records into ifttt trigger data" in {
