@@ -18,7 +18,7 @@ object Actions extends Controller {
 
       maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
 
-        ForceUtils.chatterPost(auth, message).map {
+        ForceUtils.chatterPost(auth, message).flatMap {
           case (response, Some(instanceUrl)) if response.status == CREATED =>
 
             val id = (response.json \ "id").as[String]
@@ -32,13 +32,15 @@ object Actions extends Controller {
               )
             )
 
-            Ok(json)
+            Future.successful(Ok(json))
 
           case (response, None) if response.status == FORBIDDEN =>
-            Unauthorized(error("Unauthorized", response.body))
+            Future.successful(Unauthorized(error("Unauthorized", response.body)))
 
           case (response, _) =>
-            Status(response.status)(response.body)
+            ForceUtils.saveError(auth, response.body).map { _ =>
+              Status(response.status)(response.json)
+            }
         }
       }
     }

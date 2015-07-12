@@ -3,6 +3,10 @@
 
     <h3>Recent IFTTT Channel Errors</h3>
 
+    @if(errors.isEmpty) {
+        No errors.
+    }
+
     <ul>
     @for(error <- errors) {
         <li>@error</li>
