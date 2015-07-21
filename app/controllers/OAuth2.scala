@@ -2,6 +2,7 @@ package controllers
 
 import org.apache.commons.codec.digest.DigestUtils
 import play.api.Play
+import play.api.libs.Crypto
 import play.api.libs.ws.WS
 import play.api.mvc._
 import play.api.Play.current
@@ -93,7 +94,8 @@ object OAuth2 extends Controller {
           val r = request.map(_ => body)
           tokenCode(r, code).map { json =>
             (json \ "access_token").asOpt[String].fold(Unauthorized("Could not login")) { accessToken =>
-              Redirect(s"/$url").flashing("access_token" -> accessToken)
+              val encAccessToken = Crypto.encryptAES(accessToken)
+              Redirect(s"/$url").flashing("enc_access_token" -> encAccessToken)
             }
           } recover {
             case e: Exception => InternalServerError(e.getMessage)

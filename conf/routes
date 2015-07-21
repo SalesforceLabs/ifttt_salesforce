@@ -24,5 +24,6 @@ POST        /ifttt/v1/actions/insert_a_record                                   
 POST        /ifttt/v1/actions/insert_a_record/fields/sobject/options                           controllers.ifttt.v1.Actions.insertARecordFieldsSObjectOptions
 
 GET         /errors                                                                            controllers.Application.errors
+POST        /errors-clear                                                                      controllers.Application.errorsClear
 
 GET         /webjars/*file                                                                     controllers.WebJarAssets.at(file)

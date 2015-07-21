@@ -1,7 +1,10 @@
-@(errors: Seq[String])
+@(errors: Seq[String], encAccessToken: String)
 @main("IFTTT Recipe Errors") {
 
-    <h3>Recent IFTTT Channel Errors</h3>
+    <form method="post" action="@routes.Application.errorsClear()">
+        <input type="hidden" name="enc_access_token" value="@encAccessToken"/>
+        <h3>Recent IFTTT Channel Errors <button type="submit" class="btn btn-xs btn-danger" style="margin-bottom: 5px;">Clear All</button></h3>
+    </form>
 
     @if(errors.isEmpty) {
         No errors.
