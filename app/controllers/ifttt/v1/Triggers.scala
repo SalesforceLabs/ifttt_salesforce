@@ -112,19 +112,17 @@ object Triggers extends Controller {
 
     request.headers.get(AUTHORIZATION).map { auth =>
 
-      ForceUtils.userinfo(auth).flatMap { userinfoResponse =>
+      ForceUtils.userinfo(auth).flatMap { userinfo =>
 
-        userinfoResponse.status match {
-          case OK =>
-            val queryUrl = ForceUtils.queryUrl(userinfoResponse.json)
+            val queryUrl = ForceUtils.queryUrl(userinfo)
 
-            val sobjectUrl = ForceUtils.sobjectsUrl(userinfoResponse.json)
+            val sobjectUrl = ForceUtils.sobjectsUrl(userinfo)
 
             //val userId = (userinfoResponse.json \ "user_id").as[String]
 
             //val orgId = (userinfoResponse.json \ "organization_id").as[String]
 
-            val instanceUrl = ForceUtils.instanceUrl(userinfoResponse.json)
+            val instanceUrl = ForceUtils.instanceUrl(userinfo)
 
             val query = s"""
                 |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c, ifttt__Related_Object_Type__c, ifttt__Related_Object_Id__c
@@ -165,35 +163,14 @@ object Triggers extends Controller {
                   case JsSuccess(json, _) =>
                     Future.successful(Ok(json))
                   case JsError(error) =>
-                    ForceUtils.saveError(auth, error.toString()).map { _ =>
+                    ForceUtils.saveError(auth, error.toString()) {
                       InternalServerError(Json.obj("error" -> error.toString))
                     }
                 }
 
               }
-            } recoverWith {
-              case e: Exception =>
-                // most likely the user didn't have the IFTTT Salesforce package installed.
-                ForceUtils.saveError(auth, e.getMessage).map { _ =>
-                  InternalServerError(Json.obj("error" -> e.getMessage))
-                }
             }
-          case FORBIDDEN =>
-            val json = Json.obj(
-              "errors" -> Json.arr(
-                Json.obj(
-                  "status" -> userinfoResponse.body,
-                  "message" -> ("Authentication failed: " + userinfoResponse.body)
-                )
-              )
-            )
-            Future.successful(Unauthorized(json))
-          case _ =>
-            ForceUtils.saveError(auth, userinfoResponse.body).map { _ =>
-              Status(userinfoResponse.status)(userinfoResponse.body)
-            }
-        }
-      }
+        } recoverWith ForceUtils.standardErrorHandler(auth)
 
     } getOrElse Future.successful(Unauthorized)
 
@@ -218,79 +195,53 @@ object Triggers extends Controller {
 
       request.headers.get(AUTHORIZATION).map { auth =>
 
-        ForceUtils.userinfo(auth).flatMap { userinfoResponse =>
+        ForceUtils.userinfo(auth).flatMap { userinfo =>
+          val url = ForceUtils.queryUrl(userinfo)
 
-          userinfoResponse.status match {
-            case OK =>
-              val url = ForceUtils.queryUrl(userinfoResponse.json)
+          //val userId = (userinfoResponse.json \ "user_id").as[String]
 
-              //val userId = (userinfoResponse.json \ "user_id").as[String]
+          //val orgId = (userinfoResponse.json \ "organization_id").as[String]
 
-              //val orgId = (userinfoResponse.json \ "organization_id").as[String]
-
-              val whereStatement = if (eventType != "") {
-                s"WHERE ifttt__Type__c = '$eventType'"
-              }
-              else {
-                ""
-              }
-
-              val query = s"""
-                |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c
-                |FROM ifttt__IFTTT_Event__c
-                |$whereStatement
-                |ORDER BY LastModifiedDate DESC
-                |LIMIT $limit
-              """.stripMargin
-
-              val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get().flatMap { response =>
-                response.status match {
-                  case OK =>
-                    Future.successful(response)
-                  case _ =>
-                    Future.failed(new Exception(response.body))
-                }
-              }
-
-              queryRequest.flatMap { queryResponse =>
-
-                val jsonResult = queryResponse.json.transform(iftttEventQueryResultToIFTTT)
-
-                jsonResult match {
-                  case JsSuccess(json, _) =>
-                    Future.successful(Ok(json))
-                  case JsError(error) =>
-                    ForceUtils.saveError(auth, error.toString()).map { _ =>
-                      InternalServerError(Json.obj("error" -> error.toString))
-                    }
-                }
-              } recoverWith {
-                case e: Exception =>
-                  // most likely the user didn't have the IFTTT Salesforce package installed.
-                  ForceUtils.saveError(auth, e.getMessage).map { _ =>
-                    InternalServerError(Json.obj("error" -> e.getMessage))
-                  }
-              }
-            case FORBIDDEN =>
-              val json = Json.obj(
-                "errors" -> Json.arr(
-                  Json.obj(
-                    "status" -> userinfoResponse.body,
-                    "message" -> ("Authentication failed: " + userinfoResponse.body)
-                  )
-                )
-              )
-              Future.successful(Unauthorized(json))
-            case _ =>
-              ForceUtils.saveError(auth, userinfoResponse.body).map { _ =>
-                Status(userinfoResponse.status)(userinfoResponse.body)
-              }
+          val whereStatement = if (eventType != "") {
+            s"WHERE ifttt__Type__c = '$eventType'"
           }
-        }
+          else {
+            ""
+          }
 
+          val query = s"""
+            |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c
+            |FROM ifttt__IFTTT_Event__c
+            |$whereStatement
+            |ORDER BY LastModifiedDate DESC
+            |LIMIT $limit
+          """.stripMargin
+
+          val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get().flatMap { response =>
+            response.status match {
+              case OK =>
+                Future.successful(response)
+              case _ =>
+                Future.failed(new Exception(response.body))
+            }
+          }
+
+          queryRequest.flatMap { queryResponse =>
+
+            val jsonResult = queryResponse.json.transform(iftttEventQueryResultToIFTTT)
+
+            jsonResult match {
+              case JsSuccess(json, _) =>
+                Future.successful(Ok(json))
+              case JsError(error) =>
+                ForceUtils.saveError(auth, error.toString()) {
+                  InternalServerError(Json.obj("error" -> error.toString))
+                }
+            }
+          }
+        } recoverWith ForceUtils.standardErrorHandler(auth)
       } getOrElse Future.successful(Unauthorized)
     }
-
   }
 
   def recordCreatedOrUpdatedTrigger() = Action.async(parse.json) { request =>
@@ -315,73 +266,51 @@ object Triggers extends Controller {
 
       request.headers.get(AUTHORIZATION).map { auth =>
 
-        ForceUtils.userinfo(auth).flatMap { userinfoResponse =>
+        ForceUtils.userinfo(auth).flatMap { userinfo =>
+          val url = ForceUtils.queryUrl(userinfo)
 
-          userinfoResponse.status match {
-            case OK =>
-              val url = ForceUtils.queryUrl(userinfoResponse.json)
+          val instanceUrl = ForceUtils.instanceUrl(userinfo)
 
-              val instanceUrl = ForceUtils.instanceUrl(userinfoResponse.json)
+          val whereStatement = if (queryCriteria != "") {
+            s"WHERE $queryCriteria"
+          }
+          else {
+            ""
+          }
 
-              val whereStatement = if (queryCriteria != "") {
-                s"WHERE $queryCriteria"
-              }
-              else {
-                ""
-              }
+          val query = s"""
+            |SELECT Id, LastModifiedDate
+            |FROM $sobject
+            |$whereStatement
+            |ORDER BY LastModifiedDate DESC
+            |LIMIT $limit
+          """.stripMargin
 
-              val query = s"""
-                |SELECT Id, LastModifiedDate
-                |FROM $sobject
-                |$whereStatement
-                |ORDER BY LastModifiedDate DESC
-                |LIMIT $limit
-              """.stripMargin
+          val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
 
-              val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
+          queryRequest.flatMap { queryResponse =>
+            queryResponse.status match {
+              case OK =>
+                val jsonResult = queryResponse.json.transform(anyQueryResultToIFTTT(instanceUrl))
 
-              queryRequest.flatMap { queryResponse =>
-                queryResponse.status match {
-                  case OK =>
-                    val jsonResult = queryResponse.json.transform(anyQueryResultToIFTTT(instanceUrl))
-
-                    jsonResult match {
-                      case JsSuccess(json, _) =>
-                        Future.successful(Ok(json))
-                      case JsError(error) =>
-                        ForceUtils.saveError(auth,  error.toString()).map { _ =>
-                          InternalServerError(Json.obj("error" -> error.toString))
-                        }
-                    }
-                  case _ =>
-                    val error = (queryResponse.json \\ "message").headOption.flatMap(_.asOpt[String])
-                    ForceUtils.saveError(auth,  error.getOrElse(queryResponse.json.toString())).map { _ =>
-                      InternalServerError(Json.obj("error" -> error))
+                jsonResult match {
+                  case JsSuccess(json, _) =>
+                    Future.successful(Ok(json))
+                  case JsError(error) =>
+                    ForceUtils.saveError(auth,  error.toString()) {
+                      InternalServerError(Json.obj("error" -> error.toString))
                     }
                 }
-
-
-              }
-            case FORBIDDEN =>
-              val json = Json.obj(
-                "errors" -> Json.arr(
-                  Json.obj(
-                    "status" -> userinfoResponse.body,
-                    "message" -> ("Authentication failed: " + userinfoResponse.body)
-                  )
-                )
-              )
-              Future.successful(Unauthorized(json))
-            case _ =>
-              ForceUtils.saveError(auth, userinfoResponse.body).map { _ =>
-                Status(userinfoResponse.status)(userinfoResponse.body)
-              }
+              case _ =>
+                val error = (queryResponse.json \\ "message").headOption.flatMap(_.asOpt[String])
+                ForceUtils.saveError(auth,  error.getOrElse(queryResponse.json.toString())) {
+                  InternalServerError(Json.obj("error" -> error))
+                }
+            }
           }
-        }
-
+        } recoverWith ForceUtils.standardErrorHandler(auth)
       } getOrElse Future.successful(Unauthorized)
     }
-
   }
 
   def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = ForceUtils.sobjectOptions("queryable")

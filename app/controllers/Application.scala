@@ -3,7 +3,7 @@ package controllers
 import play.api.Play
 import play.api.libs.Crypto
 import play.api.mvc.{Action, Controller}
-import utils.{Global, ForceUtils}
+import utils.{ForceUtils, Global}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -25,19 +25,14 @@ object Application extends Controller {
     } { encAccessToken =>
       val accessToken = Crypto.decryptAES(encAccessToken)
       val auth = s"Bearer $accessToken"
-      ForceUtils.userinfo(auth).flatMap { userInfoResponse =>
-        userInfoResponse.status match {
-          case OK =>
-            val userId = (userInfoResponse.json \ "user_id").as[String]
+      ForceUtils.userinfo(auth).flatMap { userInfo =>
+        val userId = (userInfo \ "user_id").as[String]
 
-            Global.redis.lrange[String](userId, 0, -1).map { errors =>
-              val encAccessToken = Crypto.encryptAES(accessToken)
-              Ok(views.html.errors(errors, encAccessToken))
-            }
-          case _ =>
-            Future.successful(InternalServerError(userInfoResponse.body))
+        Global.redis.lrange[String](userId, 0, -1).map { errors =>
+          val encAccessToken = Crypto.encryptAES(accessToken)
+          Ok(views.html.errors(errors, encAccessToken))
         }
-      }
+      } recoverWith ForceUtils.standardErrorHandler(auth)
     }
   }
 
@@ -47,18 +42,13 @@ object Application extends Controller {
     } { encAccessToken =>
       val accessToken = Crypto.decryptAES(encAccessToken)
       val auth = s"Bearer $accessToken"
-      ForceUtils.userinfo(auth).flatMap { userInfoResponse =>
-        userInfoResponse.status match {
-          case OK =>
-            val userId = (userInfoResponse.json \ "user_id").as[String]
+      ForceUtils.userinfo(auth).flatMap { userInfo =>
+        val userId = (userInfo \ "user_id").as[String]
 
-            Global.redis.del(userId).map { errors =>
-              Redirect(routes.Application.errors()).flashing("enc_access_token" -> encAccessToken)
-            }
-          case _ =>
-            Future.successful(InternalServerError(userInfoResponse.body))
+        Global.redis.del(userId).map { errors =>
+          Redirect(routes.Application.errors()).flashing("enc_access_token" -> encAccessToken)
         }
-      }
+      } recoverWith ForceUtils.standardErrorHandler(auth)
     }
   }
 

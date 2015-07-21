@@ -1,13 +1,15 @@
 package utils
 
 import org.apache.commons.codec.digest.DigestUtils
+import play.api.Logger
 import play.api.http.{Status, HeaderNames}
 import play.api.libs.json.{Json, JsObject, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
-import play.api.mvc._
+import play.api.mvc.{Result, BodyParsers, Action, Results}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 object ForceUtils {
 
@@ -17,10 +19,22 @@ object ForceUtils {
   val ENV_SANDBOX = "sandbox"
   val SALESFORCE_ENV = "salesforce-env"
 
-  def userinfo(auth: String): Future[WSResponse] = {
-    Global.redis.get[String](DigestUtils.sha1Hex(auth)).flatMap { maybeEnv =>
+  // todo: maybe put an in-memory cache here since this can get called a lot
+  def userinfo(auth: String): Future[JsValue] = {
+    val bearerAuth = if (auth.startsWith("Bearer ")) auth else s"Bearer $auth"
+
+    Global.redis.get[String](DigestUtils.sha1Hex(bearerAuth)).flatMap { maybeEnv =>
       val env = maybeEnv.getOrElse(ENV_PROD)
-      WS.url(userinfoUrl(env)).withHeaders(HeaderNames.AUTHORIZATION -> auth).get()
+      WS.url(userinfoUrl(env)).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth).get().flatMap { userInfoResponse =>
+        userInfoResponse.status match {
+          case Status.OK =>
+            Future.successful(userInfoResponse.json)
+          case Status.UNAUTHORIZED | Status.FORBIDDEN =>
+            Future.failed(UnauthorizedException(userInfoResponse.body))
+          case _ =>
+            Future.failed(new Exception(userInfoResponse.body))
+        }
+      }
     }
   }
 
@@ -34,87 +48,71 @@ object ForceUtils {
     case ENV_SANDBOX => "https://test.salesforce.com/services/oauth2/userinfo"
   }
 
-  def chatterPost(auth: String, message: String): Future[(WSResponse, Option[String])] = {
-    userinfo(auth).flatMap { response =>
-
-      response.status match {
-        case Status.OK =>
-          val userId = (response.json \ "user_id").as[String]
-          val instanceUrl = (response.json \ "profile").as[String].stripSuffix(userId)
-          val feedsUrl = (response.json \ "urls" \ "feeds").as[String].replace("{version}", API_VERSION)
-          WS.
-            url(feedsUrl + "/news/me/feed-items").
-            withHeaders(HeaderNames.AUTHORIZATION -> auth).
-            post(Map("text" -> Seq(message))).
-            map((_, Some(instanceUrl)))
-
-        case Status.FORBIDDEN =>
-          val n: Option[String] = None
-          Future.successful(response, n)
-      }
+  def chatterPost(auth: String, message: String): Future[(JsValue, String)] = {
+    userinfo(auth).flatMap { userInfo =>
+      val userId = (userInfo \ "user_id").as[String]
+      val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
+      val feedsUrl = (userInfo \ "urls" \ "feeds").as[String].replace("{version}", API_VERSION)
+      WS.
+        url(feedsUrl + "/news/me/feed-items").
+        withHeaders(HeaderNames.AUTHORIZATION -> auth).
+        post(Map("text" -> Seq(message))).
+        flatMap { createResponse =>
+          createResponse.status match {
+            case Status.CREATED =>
+              Future.successful(createResponse.json, instanceUrl)
+            case _ =>
+              Future.failed(new Exception(s"Could not post on Chatter: ${createResponse.body}"))
+          }
+        }
     }
   }
 
-  def insert(auth: String, sobject: String, json: JsValue): Future[WSResponse] = {
-    userinfo(auth).flatMap { response =>
-
-      response.status match {
-        case Status.OK =>
-          WS.
-            url(sobjectsUrl(response.json) + sobject).
-            withHeaders(HeaderNames.AUTHORIZATION -> auth).
-            post(json)
-
-        case Status.FORBIDDEN =>
-          Future.successful(response)
-      }
+  def insert(auth: String, sobject: String, json: JsValue): Future[JsValue] = {
+    userinfo(auth).flatMap { userInfo =>
+      WS.
+        url(sobjectsUrl(userInfo) + sobject).
+        withHeaders(HeaderNames.AUTHORIZATION -> auth).
+        post(json).
+        flatMap { response =>
+          response.status match {
+            case Status.CREATED =>
+              Future.successful(response.json)
+            case _ =>
+              Future.failed(new Exception(s"Could not insert a record: ${response.body}"))
+          }
+        }
     }
-
   }
 
   def sobjectOptions(filter: String): Action[JsValue] = Action.async(BodyParsers.parse.json) { request =>
 
-    request.headers.get(HeaderNames.AUTHORIZATION).map { auth =>
+    request.headers.get(HeaderNames.AUTHORIZATION).fold {
+      Future.successful(Results.Unauthorized(""))
+    } { auth =>
 
-      ForceUtils.userinfo(auth).flatMap { userinfoResponse =>
+      ForceUtils.userinfo(auth).flatMap { userinfo =>
+        val url = sobjectsUrl(userinfo)
 
-        userinfoResponse.status match {
-          case Status.OK =>
-            val url = ForceUtils.sobjectsUrl(userinfoResponse.json)
+        val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> auth).get()
 
-            val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> auth).get()
+        queryRequest.map { queryResponse =>
 
-            queryRequest.map { queryResponse =>
+          val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
 
-              val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
+          // todo: use a JSON transformer
+          val options = sobjects.filter(_.\(filter).as[Boolean]).map { json =>
+            Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
+          } sortBy (_.\("label").as[String])
 
-              // todo: use a JSON transformer
-              val options = sobjects.filter(_.\(filter).as[Boolean]).map { json =>
-                Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
-              } sortBy (_.\("label").as[String])
-
-              Results.Ok(
-                Json.obj(
-                  "data" -> options
-                )
-              )
-            }
-          case Status.FORBIDDEN =>
-            val json = Json.obj(
-              "errors" -> Json.arr(
-                Json.obj(
-                  "status" -> userinfoResponse.body,
-                  "message" -> ("Authentication failed: " + userinfoResponse.body)
-                )
-              )
+          Results.Ok(
+            Json.obj(
+              "data" -> options
             )
-            Future.successful(Results.Unauthorized(json))
-          case _ =>
-            Future.successful(Results.Status(userinfoResponse.status)(userinfoResponse.body))
+          )
         }
-      }
-
-    } getOrElse Future.successful(Results.Unauthorized(""))
+      } recoverWith standardErrorHandler(auth)
+    }
   }
 
 
@@ -124,16 +122,36 @@ object ForceUtils {
 
   def instanceUrl(value: JsValue) =  (value \ "profile").as[String].stripSuffix((value \ "user_id").as[String])
 
-  def saveError(auth: String, error: String): Future[Long] = {
-    userinfo(auth).flatMap { userInfoResponse =>
-      userInfoResponse.status match {
-        case Status.OK =>
-          val userId = (userInfoResponse.json \ "user_id").as[String]
-          Global.redis.lpush(userId, error)
-        case _ =>
-          Future.failed(new Exception("Could not get user info: " + userInfoResponse.body))
-      }
+  def saveError(auth: String, error: String)(result: => Result): Future[Result] = {
+    userinfo(auth).flatMap { userInfo =>
+      val userId = (userInfo \ "user_id").as[String]
+      Global.redis.lpush(userId, error).map(_ => result)
+    } recover {
+      case e: Exception =>
+        Logger.error(e.getMessage)
+        result
     }
+  }
+
+  def standardErrorHandler(auth: String): PartialFunction[Throwable, Future[Result]] = {
+    case UnauthorizedException(message) =>
+      val json = Json.obj(
+        "errors" -> Json.arr(
+          Json.obj(
+            "status" -> message,
+            "message" -> s"Authentication failed: $message"
+          )
+        )
+      )
+      Future.successful(Results.Unauthorized(json))
+    case e: Exception =>
+      ForceUtils.saveError(auth, e.getMessage) {
+        Results.InternalServerError(Json.obj("error" -> e.getMessage))
+      }
+  }
+
+  case class UnauthorizedException(message: String) extends Exception {
+    override def getMessage = message
   }
 
 }

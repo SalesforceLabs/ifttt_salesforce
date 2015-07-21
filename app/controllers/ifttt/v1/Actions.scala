@@ -18,10 +18,9 @@ object Actions extends Controller {
 
       maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
 
-        ForceUtils.chatterPost(auth, message).flatMap {
-          case (response, Some(instanceUrl)) if response.status == CREATED =>
+        ForceUtils.chatterPost(auth, message).map { case (createJson, instanceUrl) =>
 
-            val id = (response.json \ "id").as[String]
+            val id = (createJson \ "id").as[String]
 
             val json = Json.obj(
               "data" -> Json.arr(
@@ -32,16 +31,8 @@ object Actions extends Controller {
               )
             )
 
-            Future.successful(Ok(json))
-
-          case (response, None) if response.status == FORBIDDEN =>
-            Future.successful(Unauthorized(error("Unauthorized", response.body)))
-
-          case (response, _) =>
-            ForceUtils.saveError(auth, response.body).map { _ =>
-              Status(response.status)(response.json)
-            }
-        }
+            Ok(json)
+        } recoverWith ForceUtils.standardErrorHandler(auth)
       }
     }
   }
@@ -62,29 +53,19 @@ object Actions extends Controller {
 
       maybeSobject.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "An SObject must be specified")))) { sobject =>
 
-        ForceUtils.insert(auth, sobject, jsonToInsert).flatMap {
-          case response if response.status == CREATED =>
+        ForceUtils.insert(auth, sobject, jsonToInsert).map { createJson =>
+          val id = (createJson \ "id").as[String]
 
-            val id = (response.json \ "id").as[String]
-
-            val json = Json.obj(
-              "data" -> Json.arr(
-                Json.obj(
-                  "id" -> id
-                )
+          val json = Json.obj(
+            "data" -> Json.arr(
+              Json.obj(
+                "id" -> id
               )
             )
+          )
 
-            Future.successful(Ok(json))
-
-          case response if response.status == FORBIDDEN =>
-            Future.successful(Unauthorized(error("Unauthorized", response.body)))
-
-          case response =>
-            ForceUtils.saveError(auth, response.body).map { _ =>
-              Status(response.status)(response.json)
-            }
-        }
+          Ok(json)
+        } recoverWith ForceUtils.standardErrorHandler(auth)
       }
     }
   }
