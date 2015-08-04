@@ -1,7 +1,7 @@
 package utils
 
 import org.apache.commons.codec.digest.DigestUtils
-import play.api.Logger
+import play.api.{Play, Logger}
 import play.api.http.{Status, HeaderNames}
 import play.api.libs.json.{Json, JsObject, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
@@ -18,6 +18,9 @@ object ForceUtils {
   val ENV_PROD = "prod"
   val ENV_SANDBOX = "sandbox"
   val SALESFORCE_ENV = "salesforce-env"
+
+  lazy val salesforceOauthKey = Play.current.configuration.getString("salesforce.oauth.key").get
+  lazy val salesforceOauthSecret = Play.current.configuration.getString("salesforce.oauth.secret").get
 
   // todo: maybe put an in-memory cache here since this can get called a lot
   def userinfo(auth: String): Future[JsValue] = {
@@ -46,6 +49,25 @@ object ForceUtils {
   def userinfoUrl(env: String) = env match {
     case ENV_PROD => "https://login.salesforce.com/services/oauth2/userinfo"
     case ENV_SANDBOX => "https://test.salesforce.com/services/oauth2/userinfo"
+  }
+
+  def login(env: String, username: String, password: String): Future[JsValue] = {
+
+    val body = Map(
+      "grant_type" -> "password",
+      "client_id" -> salesforceOauthKey,
+      "client_secret" -> salesforceOauthSecret,
+      "username" -> username,
+      "password" -> password
+    ).mapValues(Seq(_))
+
+    WS.url(loginUrl(env)).post(body).flatMap { response =>
+      response.status match {
+        case Status.OK => Future.successful(response.json)
+        case _ => Future.failed(new Exception(response.body))
+      }
+    }
+
   }
 
   def chatterPost(auth: String, message: String): Future[(JsValue, String)] = {

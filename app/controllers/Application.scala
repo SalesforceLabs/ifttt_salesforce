@@ -19,7 +19,7 @@ object Application extends Controller {
   def errors = Action.async { request =>
     request.flash.get("enc_access_token").fold {
       val redirUrl = routes.OAuth2.authorized().absoluteURL(secure = request.secure)(request)
-      val qs = s"client_id=${OAuth2.salesforceOauthKey}&state=local-errors&response_type=code&prompt=login&redirect_uri=$redirUrl"
+      val qs = s"client_id=${ForceUtils.salesforceOauthKey}&state=local-errors&response_type=code&prompt=login&redirect_uri=$redirUrl"
 
       Future.successful(Ok(views.html.authorize(qs)))
     } { encAccessToken =>

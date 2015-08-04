@@ -15,9 +15,6 @@ import scala.concurrent.Future
 
 object OAuth2 extends Controller {
 
-  lazy val salesforceOauthKey = Play.current.configuration.getString("salesforce.oauth.key").get
-  lazy val salesforceOauthSecret = Play.current.configuration.getString("salesforce.oauth.secret").get
-
   /*
   Step 1
 
@@ -86,8 +83,8 @@ object OAuth2 extends Controller {
 
           val body = Map(
             "grant_type" -> Seq("authorization_code"),
-            "client_id" -> Seq(salesforceOauthKey),
-            "client_secret" -> Seq(salesforceOauthSecret),
+            "client_id" -> Seq(ForceUtils.salesforceOauthKey),
+            "client_secret" -> Seq(ForceUtils.salesforceOauthSecret),
             "code" -> Seq(code)
           )
 
