@@ -3,6 +3,7 @@ package controllers.ifttt.v1
 import java.text.NumberFormat
 
 import org.joda.time.DateTime
+import org.joda.time.format.ISODateTimeFormat
 import play.api.libs.ws.WS
 import play.api.mvc.{Controller, Action}
 import play.api.Play.current
@@ -38,6 +39,7 @@ object Triggers extends Controller {
                 "name" -> name,
                 "amount" -> nf.format(amounts.getOrElse(oppId, 0)),
                 "link_to_opportunity" -> (instanceUrl + oppId),
+                "timestamp" -> ISODateTimeFormat.dateTime().print(timestamp),
                 "meta" -> Json.obj(
                   "id" -> id,
                   "timestamp" -> timestamp.getMillis / 1000
@@ -67,6 +69,7 @@ object Triggers extends Controller {
                 "type" -> eventType,
                 "subject" -> subject,
                 "message" -> message,
+                "timestamp" -> ISODateTimeFormat.dateTime().print(timestamp),
                 "meta" -> Json.obj(
                   "id" -> id,
                   "timestamp" -> timestamp.getMillis / 1000
@@ -92,6 +95,7 @@ object Triggers extends Controller {
 
               Json.obj(
                 "link_to_record" -> linkToRecord,
+                "timestamp" -> ISODateTimeFormat.dateTime().print(timestamp),
                 "meta" -> Json.obj(
                   "id" -> id,
                   "timestamp" -> timestamp.getMillis / 1000
