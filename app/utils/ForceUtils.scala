@@ -22,6 +22,9 @@ object ForceUtils {
   lazy val salesforceOauthKey = Play.current.configuration.getString("salesforce.oauth.key").get
   lazy val salesforceOauthSecret = Play.current.configuration.getString("salesforce.oauth.secret").get
 
+  lazy val managedPackageId = Play.current.configuration.getString("salesforce.managed-package-id").get
+
+
   // todo: maybe put an in-memory cache here since this can get called a lot
   def userinfo(auth: String): Future[JsValue] = {
     val bearerAuth = if (auth.startsWith("Bearer ")) auth else s"Bearer $auth"

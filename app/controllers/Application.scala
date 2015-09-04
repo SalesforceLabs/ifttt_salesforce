@@ -10,10 +10,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object Application extends Controller {
 
-  lazy val managedPackageId = Play.current.configuration.getString("salesforce.managed-package-id").get
-
   def index() = Action {
-    Ok(views.html.index(managedPackageId))
+    Ok(views.html.index())
   }
 
   def errors = Action.async { request =>
@@ -21,7 +19,7 @@ object Application extends Controller {
       val redirUrl = routes.OAuth2.authorized().absoluteURL(secure = request.secure)(request)
       val qs = s"client_id=${ForceUtils.salesforceOauthKey}&state=local-errors&response_type=code&prompt=login&redirect_uri=$redirUrl"
 
-      Future.successful(Ok(views.html.authorize(qs)))
+      Future.successful(Ok(views.html.authorize(qs, ForceUtils.managedPackageId)))
     } { encAccessToken =>
       val accessToken = Crypto.decryptAES(encAccessToken)
       val auth = s"Bearer $accessToken"

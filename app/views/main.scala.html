@@ -3,23 +3,61 @@
 <html>
     <head>
         <title>@title</title>
-        <link rel="stylesheet" href="@StaticWebJarAssets.getUrl("bootstrap.min.css")">
+        <link rel="stylesheet" href="@StaticWebJarAssets.getUrl("assets/styles/salesforce-lightning-design-system.css")">
         <style>
+            @@font-face {
+                font-family: "Salesforce Sans";
+                src: url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-Light.woff2")") format("woff2"), url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-Light.woff")") format("woff");
+                font-weight: 300;
+            }
+
+            @@font-face {
+                font-family: "Salesforce Sans";
+                src: url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-LightItalic.woff2")") format("woff2"), url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-LightItalic.woff")") format("woff");
+                font-style: italic;
+                font-weight: 300;
+            }
+
+            @@font-face {
+                font-family: "Salesforce Sans";
+                src: url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-Regular.woff2")") format("woff2"), url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-Regular.woff")") format("woff");
+                font-weight: 400;
+            }
+
+            @@font-face {
+                font-family: "Salesforce Sans";
+                src: url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-Italic.woff2")") format("woff2"), url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-Italic.woff")") format("woff");
+                font-style: italic;
+                font-weight: 400;
+            }
+
+            @@font-face {
+                font-family: "Salesforce Sans";
+                src: url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-Bold.woff2")") format("woff2"), url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-Bold.woff")") format("woff");
+                font-weight: 700;
+            }
+
+            @@font-face {
+                font-family: "Salesforce Sans";
+                src: url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-BoldItalic.woff2")") format("woff2"), url("@StaticWebJarAssets.getUrl("assets/fonts/webfonts/SalesforceSans-BoldItalic.woff")") format("woff");
+                font-style: italic;
+                font-weight: 700;
+            }
+
             body {
-                padding-top: 60px;
+                width: 100%;
             }
         </style>
     </head>
     <body>
-        <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-            <div class="container">
-                <div class="navbar-header">
-                    <a class="navbar-brand" href="#">Salesforce IFTTT Channel</a>
-                </div>
-            </div>
+        <div class="slds-container--center slds-container--small" style="text-align: center;">
+            <img src="@routes.Assets.at("images/salesforce.svg")" style="height: 57px">
+            <svg aria-hidden="true" class="slds-icon slds-icon--small slds-icon-text-default" style="margin-bottom: 10px; margin-left: 20px;">
+                <use xlink:href="@StaticWebJarAssets.getUrl("assets/icons/utility-sprite/svg/symbols.svg")#add"></use>
+            </svg>
+            <img src="@routes.Assets.at("images/ifttt.svg")" style="height: 90px;">
         </div>
-
-        <div class="container">
+        <div class="slds-container--center slds-container--small" style="text-align: center;">
             @content
         </div>
 

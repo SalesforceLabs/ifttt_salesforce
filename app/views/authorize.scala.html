@@ -1,8 +1,24 @@
-@(qs: String)
+@(qs: String, managedPackageId: String)
+
 @main("Authorize with Salesforce") {
-    Authenticate with Salesforce:
-    <ul>
-        <li><a href="@routes.OAuth2.authorizeProd()?@qs">Production & Developer Org</a></li>
-        <li><a href="@routes.OAuth2.authorizeSandbox()?@qs">Sandbox Org</a></li>
-    </ul>
+
+    <div class="slds-box slds-box slds-theme--shade slds-theme--alert-texture">
+        <p>
+            If you plan to use the <strong>Custom Salesforce Trigger</strong> or <strong>Opportunity was won</strong> Salesforce IFTTT Trigger, then you (or your Salesforce Admin) must install the Salesforce IFTTT Package.
+        </p>
+        <p>
+            <a href="https://login.salesforce.com/packaging/installPackage.apexp?p0=@managedPackageId" target="_blank" class="slds-button slds-button--neutral">Install in a Production or Developer Org</a>
+            <a href="https://test.salesforce.com/packaging/installPackage.apexp?p0=@managedPackageId" target="_blank" class="slds-button slds-button--neutral">Install in a Sandbox Org</a>
+        </p>
+    </div>
+
+    <div class="slds-card slds-card--empty" style="margin-top: 20px;">
+        <header class="slds-card__header slds-grid grid--flex-spread">
+            <h3 class="slds-text-heading--small slds-truncate">Activate the Salesforce IFTTT Channel</h3>
+        </header>
+        <section class="slds-card__body">
+            <a href="@routes.OAuth2.authorizeProd()?@qs" class="slds-button slds-button--brand">Login with a Production or Developer Org</a>
+            <a href="@routes.OAuth2.authorizeSandbox()?@qs" class="slds-button slds-button--brand">Login with a Sandbox Org</a>
+        </section>
+    </div>
 }

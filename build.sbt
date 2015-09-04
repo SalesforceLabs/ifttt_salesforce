@@ -12,7 +12,7 @@ libraryDependencies ++= Seq(
   ws,
   "com.etaty.rediscala" %% "rediscala" % "1.4.0",
   "org.webjars" %% "webjars-play" % "2.3.0-3",
-  "org.webjars" % "bootstrap" % "3.2.0"
+  "org.webjars" % "salesforce-lightning-design-system" % "0.8.0"
 )
 
 username in Force := sys.env.getOrElse("SALESFORCE_USERNAME", "")

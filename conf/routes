@@ -27,3 +27,5 @@ GET         /errors                                                             
 POST        /errors-clear                                                                      controllers.Application.errorsClear
 
 GET         /webjars/*file                                                                     controllers.WebJarAssets.at(file)
+
+GET         /assets/*file                                                                      controllers.Assets.at(path = "/public", file)

@@ -31,7 +31,7 @@ object OAuth2 extends Controller {
         }.mkString("&")
       }.getOrElse("")
 
-      Ok(views.html.authorize(qs))
+      Ok(views.html.authorize(qs, ForceUtils.managedPackageId))
     }
     else {
       Redirect(routes.Application.index())
