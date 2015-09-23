@@ -3,7 +3,7 @@ package utils
 import org.apache.commons.codec.digest.DigestUtils
 import play.api.{Play, Logger}
 import play.api.http.{Status, HeaderNames}
-import play.api.libs.json.{Json, JsObject, JsValue}
+import play.api.libs.json.{JsArray, Json, JsObject, JsValue}
 import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import play.api.mvc.{Result, BodyParsers, Action, Results}
@@ -13,7 +13,7 @@ import scala.util.{Failure, Success}
 
 object ForceUtils {
 
-  val API_VERSION = "30.0"
+  val API_VERSION = "34.0"
 
   val ENV_PROD = "prod"
   val ENV_SANDBOX = "sandbox"
@@ -24,14 +24,13 @@ object ForceUtils {
 
   lazy val managedPackageId = Play.current.configuration.getString("salesforce.managed-package-id").get
 
+  private def bearerAuth(auth: String) = if (auth.startsWith("Bearer ")) auth else s"Bearer $auth"
 
   // todo: maybe put an in-memory cache here since this can get called a lot
   def userinfo(auth: String): Future[JsValue] = {
-    val bearerAuth = if (auth.startsWith("Bearer ")) auth else s"Bearer $auth"
-
-    Global.redis.get[String](DigestUtils.sha1Hex(bearerAuth)).flatMap { maybeEnv =>
+    Global.redis.get[String](DigestUtils.sha1Hex(bearerAuth(auth))).flatMap { maybeEnv =>
       val env = maybeEnv.getOrElse(ENV_PROD)
-      WS.url(userinfoUrl(env)).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth).get().flatMap { userInfoResponse =>
+      WS.url(userinfoUrl(env)).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).get().flatMap { userInfoResponse =>
         userInfoResponse.status match {
           case Status.OK =>
             Future.successful(userInfoResponse.json)
@@ -73,16 +72,31 @@ object ForceUtils {
 
   }
 
-  def chatterPost(auth: String, message: String): Future[(JsValue, String)] = {
+  def chatterPostMessage(auth: String, message: String, groupId: Option[String]): Future[(JsValue, String)] = {
     userinfo(auth).flatMap { userInfo =>
       val userId = (userInfo \ "user_id").as[String]
+      val subjectId = groupId.getOrElse(userId)
       val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
-      val feedsUrl = (userInfo \ "urls" \ "feeds").as[String].replace("{version}", API_VERSION)
-      WS.
-        url(feedsUrl + "/news/me/feed-items").
-        withHeaders(HeaderNames.AUTHORIZATION -> auth).
-        post(Map("text" -> Seq(message))).
-        flatMap { createResponse =>
+      val restUrl = (userInfo \ "urls" \ "rest").as[String].replace("{version}", API_VERSION)
+      val url = restUrl + "chatter/feed-elements"
+
+      val json = Json.obj(
+        "body" -> Json.obj(
+          "messageSegments" -> Json.arr(
+            Json.obj(
+              "type" -> "Text",
+              "text" -> message
+            )
+          )
+        ),
+        "feedElementType" -> "FeedItem",
+        "subjectId" -> subjectId
+      )
+
+      WS.url(url)
+        .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+        .post(json)
+        .flatMap { createResponse =>
           createResponse.status match {
             case Status.CREATED =>
               Future.successful(createResponse.json, instanceUrl)
@@ -110,6 +124,7 @@ object ForceUtils {
     }
   }
 
+  // todo: move action code out of here
   def sobjectOptions(filter: String): Action[JsValue] = Action.async(BodyParsers.parse.json) { request =>
 
     request.headers.get(HeaderNames.AUTHORIZATION).fold {
@@ -137,6 +152,29 @@ object ForceUtils {
           )
         }
       } recoverWith standardErrorHandler(auth)
+    }
+  }
+
+  def chatterGroups(auth: String): Future[JsArray] = {
+    // /chatter/users/userId/groups
+    userinfo(auth).flatMap { userInfo =>
+      val userId = (userInfo \ "user_id").as[String]
+      val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
+      val usersUrl = (userInfo \ "urls" \ "users").as[String].replace("{version}", API_VERSION)
+      val url = usersUrl + s"/$userId/groups"
+
+      WS.url(url)
+        .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+        .withQueryString("pageSize" -> 250.toString)
+        .get()
+        .flatMap { response =>
+        response.status match {
+          case Status.OK =>
+            Future.successful((response.json \ "groups").as[JsArray])
+          case _ =>
+            Future.failed(new Exception(s"Could not get Chatter groups: ${response.body}"))
+        }
+      }
     }
   }
 

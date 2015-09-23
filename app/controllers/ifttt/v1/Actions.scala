@@ -15,10 +15,11 @@ object Actions extends Controller {
     request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
 
       val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String]
+      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String]
 
       maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
 
-        ForceUtils.chatterPost(auth, message).map { case (createJson, instanceUrl) =>
+        ForceUtils.chatterPostMessage(auth, message, maybeGroup).map { case (createJson, instanceUrl) =>
 
             val id = (createJson \ "id").as[String]
 
@@ -72,6 +73,23 @@ object Actions extends Controller {
 
   def insertARecordFieldsSObjectOptions() = ForceUtils.sobjectOptions("createable")
 
+  def postOnChatterFieldsGroupOptions() = Action.async(parse.json) { request =>
+    request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
+      ForceUtils.chatterGroups(auth).map { groups =>
+
+        val options = groups.value.map { group =>
+          Json.obj("label" -> (group \ "name").as[String], "value" -> (group \ "id").as[String])
+        } sortBy (_.\("label").as[String])
+
+        Ok(
+          Json.obj(
+            "data" -> options
+          )
+        )
+      }  recoverWith ForceUtils.standardErrorHandler(auth)
+    }
+  }
+
   private def error(status: String, message: String): JsObject = {
     Json.obj(
       "errors" -> Json.arr(
@@ -82,6 +100,5 @@ object Actions extends Controller {
       )
     )
   }
-
 
 }

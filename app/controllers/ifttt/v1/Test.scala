@@ -2,7 +2,7 @@ package controllers.ifttt.v1
 
 import controllers.ifttt.v1.Application._
 import play.api.Play
-import play.api.libs.json.Json
+import play.api.libs.json.{JsNull, Json}
 import play.api.mvc.Action
 import utils.ForceUtils
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -35,7 +35,8 @@ object Test {
                 ),
                 "actions" -> Json.obj(
                   "post_on_chatter" -> Json.obj(
-                    "message" -> "A test message"
+                    "message" -> "A test message",
+                    "group" -> "0F9j000000074BA"
                   ),
                   "insert_a_record" -> Json.obj(
                     "sobject" -> "Event",
