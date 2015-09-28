@@ -38,6 +38,17 @@ object Test {
                     "message" -> "A test message",
                     "group" -> "0F9j000000074BA"
                   ),
+                  "post_chatter_file" -> Json.obj(
+                    "file_url" -> "http://investor.salesforce.com/files/design/newlogo-company.png",
+                    "file_name" -> "Foo.png",
+                    "message" -> "A test message",
+                    "group" -> "0F9j000000074BA"
+                  ),
+                  "post_chatter_link" -> Json.obj(
+                    "link" -> "http://www.jamesward.com",
+                    "message" -> "A test message",
+                    "group" -> "0F9j000000074BA"
+                  ),
                   "insert_a_record" -> Json.obj(
                     "sobject" -> "Event",
                     "field_name_1" -> "StartDateTime",

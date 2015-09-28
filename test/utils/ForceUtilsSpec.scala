@@ -3,7 +3,6 @@ package utils
 import org.specs2.specification.BeforeExample
 import play.api.Play
 import play.api.test.{FakeApplication, PlaySpecification}
-import play.api.test.Helpers._
 
 class ForceUtilsSpec extends PlaySpecification with SingleInstance {
 
@@ -31,6 +30,20 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
     }
     "post to a user feed" in {
       val json = await(ForceUtils.chatterPostMessage(authToken, "test", Some("0F9j000000074BA")))
+      (json._1 \ "id").asOpt[String] should beSome
+    }
+  }
+
+  "chatterPostFile" should {
+    "post a file to a user feed" in {
+      val json = await(ForceUtils.chatterPostFile(authToken, "http://investor.salesforce.com/files/design/newlogo-company.png", "foooo.png", None, None))
+      (json._1 \ "id").asOpt[String] should beSome
+    }
+  }
+
+  "chatterPostLink" should {
+    "post a link to a user feed" in {
+      val json = await(ForceUtils.chatterPostLink(authToken, "http://www.jamesward.com", None, None))
       (json._1 \ "id").asOpt[String] should beSome
     }
   }
