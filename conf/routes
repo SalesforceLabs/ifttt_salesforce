@@ -28,6 +28,8 @@ POST        /ifttt/v1/actions/post_chatter_link/fields/group/options            
 POST        /ifttt/v1/actions/insert_a_record                                                  controllers.ifttt.v1.Actions.insertARecord
 POST        /ifttt/v1/actions/insert_a_record/fields/sobject/options                           controllers.ifttt.v1.Actions.insertARecordFieldsSObjectOptions
 
+GET         /install                                                                           controllers.Application.install
+
 GET         /errors                                                                            controllers.Application.errors
 POST        /errors-clear                                                                      controllers.Application.errorsClear
 

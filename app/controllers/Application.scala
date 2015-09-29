@@ -1,6 +1,5 @@
 package controllers
 
-import play.api.Play
 import play.api.libs.Crypto
 import play.api.mvc.{Action, Controller}
 import utils.{ForceUtils, Global}
@@ -12,6 +11,10 @@ object Application extends Controller {
 
   def index() = Action {
     Ok(views.html.index())
+  }
+
+  def install = Action {
+    Ok(views.html.install(ForceUtils.managedPackageId))
   }
 
   def errors = Action.async { request =>
