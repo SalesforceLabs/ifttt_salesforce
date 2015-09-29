@@ -10,30 +10,87 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object Actions extends Controller {
 
-  def postOnChatter = Action.async(parse.json) { request =>
+  def postMessageOnChatter = Action.async(parse.json) { request =>
+    request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
+
+      def responseJson(json: JsValue, instanceUrl: String): JsValue = {
+        val id = (json \ "id").as[String]
+
+        Json.obj(
+          "data" -> Json.arr(
+            Json.obj(
+              "id" -> id,
+              "url" -> (instanceUrl + id)
+            )
+          )
+        )
+      }
+
+      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String]
+      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String]
+
+      maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
+        ForceUtils.chatterPostMessage(auth, message, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+      } recoverWith ForceUtils.standardErrorHandler(auth)
+    }
+  }
+
+  def postFileOnChatter = Action.async(parse.json) { request =>
+    request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
+
+      def responseJson(json: JsValue, instanceUrl: String): JsValue = {
+        val id = (json \ "id").as[String]
+
+        Json.obj(
+          "data" -> Json.arr(
+            Json.obj(
+              "id" -> id,
+              "url" -> (instanceUrl + id)
+            )
+          )
+        )
+      }
+
+      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String]
+      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String]
+      val maybeFileUrl = (request.body \ "actionFields" \ "file_url").asOpt[String]
+      val maybeFileName = (request.body \ "actionFields" \ "file_name").asOpt[String]
+
+      val resultFuture = (maybeFileUrl, maybeFileName) match {
+        case (Some(fileUrl), Some(fileName)) =>
+          ForceUtils.chatterPostFile(auth, fileUrl, fileName, maybeMessage, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+        case _ =>
+          Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Both the File URL and File Name are required")))
+      }
+
+      resultFuture.recoverWith(ForceUtils.standardErrorHandler(auth))
+    }
+  }
+
+  def postLinkOnChatter = Action.async(parse.json) { request =>
 
     request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
 
-      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String]
+      def responseJson(json: JsValue, instanceUrl: String): JsValue = {
+        val id = (json \ "id").as[String]
 
-      maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
-
-        ForceUtils.chatterPost(auth, message).map { case (createJson, instanceUrl) =>
-
-            val id = (createJson \ "id").as[String]
-
-            val json = Json.obj(
-              "data" -> Json.arr(
-                Json.obj(
-                  "id" -> id,
-                  "url" -> (instanceUrl + id)
-                )
-              )
+        Json.obj(
+          "data" -> Json.arr(
+            Json.obj(
+              "id" -> id,
+              "url" -> (instanceUrl + id)
             )
-
-            Ok(json)
-        } recoverWith ForceUtils.standardErrorHandler(auth)
+          )
+        )
       }
+
+      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String]
+      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String]
+      val maybeLinkUrl = (request.body \ "actionFields" \ "link").asOpt[String]
+
+      maybeLinkUrl.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "The link is required")))) { linkUrl =>
+        ForceUtils.chatterPostLink(auth, linkUrl, maybeMessage, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+      } recoverWith ForceUtils.standardErrorHandler(auth)
     }
   }
 
@@ -72,6 +129,23 @@ object Actions extends Controller {
 
   def insertARecordFieldsSObjectOptions() = ForceUtils.sobjectOptions("createable")
 
+  def postOnChatterFieldsGroupOptions() = Action.async(parse.json) { request =>
+    request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
+      ForceUtils.chatterGroups(auth).map { groups =>
+
+        val options = groups.value.map { group =>
+          Json.obj("label" -> (group \ "name").as[String], "value" -> (group \ "id").as[String])
+        } sortBy (_.\("label").as[String])
+
+        Ok(
+          Json.obj(
+            "data" -> options
+          )
+        )
+      }  recoverWith ForceUtils.standardErrorHandler(auth)
+    }
+  }
+
   private def error(status: String, message: String): JsObject = {
     Json.obj(
       "errors" -> Json.arr(
@@ -82,6 +156,5 @@ object Actions extends Controller {
       )
     )
   }
-
 
 }

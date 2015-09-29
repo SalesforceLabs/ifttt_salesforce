@@ -41,6 +41,7 @@ class TriggersSpec extends Specification with JsonMatchers {
                   "amount" -> "$0",
                   "name" -> "asdf",
                   "link_to_opportunity" -> "006o0000002el8xAAB",
+                  "timestamp" -> "2014-07-02T09:55:32.000-06:00",
                   "meta" -> JSONObject(
                     Map(
                       "id" -> "006o0000002el8xAAA",
