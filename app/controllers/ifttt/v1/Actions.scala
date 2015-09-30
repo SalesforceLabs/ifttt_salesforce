@@ -26,8 +26,8 @@ object Actions extends Controller {
         )
       }
 
-      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String]
-      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String]
+      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String].filterNot(_.isEmpty)
+      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String].filterNot(_.isEmpty)
 
       maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
         ForceUtils.chatterPostMessage(auth, message, maybeGroup).map((responseJson _).tupled).map(Ok(_))
@@ -51,8 +51,8 @@ object Actions extends Controller {
         )
       }
 
-      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String]
-      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String]
+      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String].filterNot(_.isEmpty)
+      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String].filterNot(_.isEmpty)
       val maybeFileUrl = (request.body \ "actionFields" \ "file_url").asOpt[String]
       val maybeFileName = (request.body \ "actionFields" \ "file_name").asOpt[String]
 
@@ -84,8 +84,8 @@ object Actions extends Controller {
         )
       }
 
-      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String]
-      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String]
+      val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String].filterNot(_.isEmpty)
+      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String].filterNot(_.isEmpty)
       val maybeLinkUrl = (request.body \ "actionFields" \ "link").asOpt[String]
 
       maybeLinkUrl.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "The link is required")))) { linkUrl =>
