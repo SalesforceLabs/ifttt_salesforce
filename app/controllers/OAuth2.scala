@@ -22,16 +22,20 @@ object OAuth2 extends Controller {
    */
   def authorize = Action { request =>
     if (request.queryString.contains("client_id") && request.queryString.contains("response_type") && request.queryString.contains("state")) {
-      val qsMap = request.queryString - "scope"
+      val qsMap = (request.queryString - "scope") + ("prompt" -> Seq("login"))
       val qsMapWithRedir = qsMap.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure = true)(request)))
       import java.net.URLEncoder
-      val qs = Option(qsMapWithRedir).filterNot(_.isEmpty).map { params =>
+
+      def toQs(qsMap: Map[String, Seq[String]]): String = Option(qsMap).filterNot(_.isEmpty).map { params =>
         params.toSeq.flatMap { pair =>
           pair._2.map(value => pair._1 + "=" + URLEncoder.encode(value, "utf-8"))
         }.mkString("&")
       }.getOrElse("")
 
-      Ok(views.html.authorize(qs, ForceUtils.managedPackageId))
+      val qs = toQs(qsMapWithRedir)
+      val errorQs = toQs(qsMapWithRedir.updated("state", Seq("local-errors")))
+
+      Ok(views.html.authorize(qs, errorQs, ForceUtils.managedPackageId))
     }
     else {
       Redirect(routes.Application.index())

@@ -1,10 +1,10 @@
-@(qs: String, errorQs: String, managedPackageId: String)
+@(qs: String, managedPackageId: String)
 
-@main("Authorize with Salesforce") {
+@main("Login to See Your Error Report") {
 
     <div class="slds-card slds-card--empty" style="margin-top: 20px;">
         <header class="slds-card__header slds-grid grid--flex-spread slds-grid--align-center">
-            <h3 class="slds-text-heading--small slds-truncate">Activate the Salesforce IFTTT Channel</h3>
+            <h3 class="slds-text-heading--small slds-truncate">Login to See Your Error Report</h3>
         </header>
         <section class="slds-card__body">
             <a href="@routes.OAuth2.authorizeProd()?@qs" class="slds-button slds-button--brand">Log into Salesforce</a>
@@ -15,8 +15,4 @@
         </section>
     </div>
 
-    @* todo: provide Sandbox option *@
-    <div class="slds-text-body--small" style="margin-top: 20px;">
-        If you are encountering errors, <a href="@routes.OAuth2.authorizeProd()?@errorQs">check your error report</a> for details.
-    </div>
 }

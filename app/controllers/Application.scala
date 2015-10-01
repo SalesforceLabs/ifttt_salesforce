@@ -22,7 +22,7 @@ object Application extends Controller {
       val redirUrl = routes.OAuth2.authorized().absoluteURL(secure = request.secure)(request)
       val qs = s"client_id=${ForceUtils.salesforceOauthKey}&state=local-errors&response_type=code&prompt=login&redirect_uri=$redirUrl"
 
-      Future.successful(Ok(views.html.authorize(qs, ForceUtils.managedPackageId)))
+      Future.successful(Ok(views.html.authorizeErrors(qs, ForceUtils.managedPackageId)))
     } { encAccessToken =>
       val accessToken = Crypto.decryptAES(encAccessToken)
       val auth = s"Bearer $accessToken"
@@ -30,8 +30,14 @@ object Application extends Controller {
         val userId = (userInfo \ "user_id").as[String]
 
         Global.redis.lrange[String](userId, 0, -1).map { errors =>
-          val encAccessToken = Crypto.encryptAES(accessToken)
-          Ok(views.html.errors(errors, encAccessToken))
+          val friendlyErrors = errors.distinct.map {
+            case error if error.contains("Object type 'ifttt__IFTTT_Event__c' is not supported") =>
+              views.html.packageNotFound(ForceUtils.managedPackageId).toString()
+            case error =>
+              views.html.standardError(error).toString()
+          }
+
+          Ok(views.html.errors(friendlyErrors, encAccessToken))
         }
       } recoverWith ForceUtils.standardErrorHandler(auth)
     }

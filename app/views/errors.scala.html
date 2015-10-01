@@ -1,10 +1,7 @@
 @(errors: Seq[String], encAccessToken: String)
 @main("IFTTT Recipe Errors") {
 
-    <form method="post" action="@routes.Application.errorsClear()">
-        <input type="hidden" name="enc_access_token" value="@encAccessToken"/>
-        <h3>Recent IFTTT Channel Errors <button type="submit" class="btn btn-xs btn-danger" style="margin-bottom: 5px;">Clear All</button></h3>
-    </form>
+    <div class="slds-text-heading--large" style="margin-bottom: 30px;">IFTTT Recipe Errors</div>
 
     @if(errors.isEmpty) {
         No errors.
@@ -12,8 +9,13 @@
 
     <ul>
     @for(error <- errors) {
-        <li>@error</li>
+        <li>@Html(error)</li>
     }
     </ul>
+
+    <form method="post" action="@routes.Application.errorsClear()" style="margin-top: 30px;">
+        <input type="hidden" name="enc_access_token" value="@encAccessToken"/>
+        <button type="submit" class="slds-button slds-button--neutral slds-button--small">Clear Errors</button>
+    </form>
 
 }
