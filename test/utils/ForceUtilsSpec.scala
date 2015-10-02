@@ -36,8 +36,9 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
 
   "chatterPostFile" should {
     "post a file to a user feed" in {
-      val json = await(ForceUtils.chatterPostFile(authToken, "http://investor.salesforce.com/files/design/newlogo-company.png", "foooo.png", None, None))
+      val json = await(ForceUtils.chatterPostFile(authToken, "http://www.jamesward.com/images/james_ward_2015.jpg", "foooo.png", None, None))
       (json._1 \ "id").asOpt[String] should beSome
+      (json._1 \ "capabilities" \ "content" \ "checksum").asOpt[String] should beSome("6a1fa22d29a720ac58930c3ababdf05b")
     }
   }
 
@@ -47,7 +48,7 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
       (json._1 \ "id").asOpt[String] should beSome
     }
   }
-
+  
 }
 
 trait SingleInstance extends BeforeExample {

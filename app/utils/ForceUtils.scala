@@ -1,16 +1,21 @@
 package utils
 
-import java.io.InputStream
+import java.io.{OutputStream, IOException, BufferedInputStream, InputStream}
 import java.net.{HttpURLConnection, URL}
 
 import com.ning.http.client._
-import com.ning.http.multipart.{PartSource, FilePart, StringPart, Part}
+import com.ning.http.multipart.FilePart
+import com.ning.http.multipart.Part
+import com.ning.http.multipart.StringPart
+import com.ning.http.multipart._
 import org.apache.commons.codec.digest.DigestUtils
+import play.api.libs.MimeTypes
+import play.api.libs.iteratee.Iteratee
 import play.api.libs.ws.ning.NingWSResponse
 import play.api.{Play, Logger}
 import play.api.http.{ContentTypes, Status, HeaderNames}
 import play.api.libs.json.{JsArray, Json, JsObject, JsValue}
-import play.api.libs.ws.{WSResponse, WS}
+import play.api.libs.ws.{WSResponseHeaders, WSResponse, WS}
 import play.api.Play.current
 import play.api.mvc._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -191,62 +196,56 @@ object ForceUtils {
     override def getContentType: String = ContentTypes.JSON
   }
 
-  class HttpPartSource(url: URL, fileName: String) extends PartSource {
-    val urlConnection = url.openConnection.asInstanceOf[HttpURLConnection]
-
-    override def getLength: Long = urlConnection.getContentLengthLong
-
-    override def createInputStream(): InputStream = urlConnection.getInputStream
-
-    override def getFileName: String = fileName
-  }
-
+  // todo: max file size
   def chatterPostFile(auth: String, fileUrl: String, fileName: String, maybeMessage: Option[String], maybeGroup: Option[String]): Future[(JsValue, String)] = {
     userinfo(auth).flatMap { userInfo =>
-      val userId = (userInfo \ "user_id").as[String]
-      val subjectId = maybeGroup.getOrElse(userId)
-      val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
-      val restUrl = (userInfo \ "urls" \ "rest").as[String].replace("{version}", API_VERSION)
-      val url = restUrl + "chatter/feed-elements"
+      WS.url(fileUrl).get().flatMap { response =>
+        val fileBytes = response.underlying[com.ning.http.client.Response].getResponseBodyAsBytes
 
-      val json = Json.obj(
-        "capabilities" -> Json.obj(
-          "content" -> Json.obj(
-            "title" -> fileName
-          )
-        ),
-        "feedElementType" -> "FeedItem",
-        "subjectId" -> subjectId
-      )
+        val userId = (userInfo \ "user_id").as[String]
+        val subjectId = maybeGroup.getOrElse(userId)
+        val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
+        val restUrl = (userInfo \ "urls" \ "rest").as[String].replace("{version}", API_VERSION)
+        val url = restUrl + "chatter/feed-elements"
 
-      val jsonWithMaybeMessage = maybeMessage.fold(json) { message =>
-        val body = Json.obj(
-          "body" -> Json.obj(
-            "messageSegments" -> Json.arr(
-              Json.obj(
-                "type" -> "Text",
-                "text" -> message
+        val json = Json.obj(
+          "capabilities" -> Json.obj(
+            "content" -> Json.obj(
+              "title" -> fileName
+            )
+          ),
+          "feedElementType" -> "FeedItem",
+          "subjectId" -> subjectId
+        )
+
+        val jsonWithMaybeMessage = maybeMessage.fold(json) { message =>
+          val body = Json.obj(
+            "body" -> Json.obj(
+              "messageSegments" -> Json.arr(
+                Json.obj(
+                  "type" -> "Text",
+                  "text" -> message
+                )
               )
             )
           )
-        )
 
-        json ++ body
-      }
+          json ++ body
+        }
 
-      val jsonPart = new JsonPart("json", jsonWithMaybeMessage)
+        val jsonPart = new JsonPart("json", jsonWithMaybeMessage)
 
-      val httpPartSource = new HttpPartSource(new URL(fileUrl), fileName)
-      val filePart = new FilePart("feedElementFileUpload", httpPartSource)
+        val filePartSource = new ByteArrayPartSource(fileName, fileBytes)
 
-      postMultiPart(url, Seq(HeaderNames.AUTHORIZATION -> bearerAuth(auth)), Seq(jsonPart, filePart)).flatMap { createResponse =>
-        // todo: close the inputstream?
-        httpPartSource.urlConnection.disconnect()
-        createResponse.status match {
-          case Status.CREATED =>
-            Future.successful(createResponse.json, instanceUrl)
-          case _ =>
-            Future.failed(new Exception(s"Could not post on Chatter: ${createResponse.body}"))
+        val filePart = new FilePart("feedElementFileUpload", filePartSource)
+
+        postMultiPart(url, Seq(HeaderNames.AUTHORIZATION -> bearerAuth(auth)), Seq(jsonPart, filePart)).flatMap { createResponse =>
+          createResponse.status match {
+            case Status.CREATED =>
+              Future.successful(createResponse.json, instanceUrl)
+            case _ =>
+              Future.failed(new Exception(s"Could not post on Chatter: ${createResponse.body}"))
+          }
         }
       }
     }
