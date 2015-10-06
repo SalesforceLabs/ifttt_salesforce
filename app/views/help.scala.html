@@ -1,0 +1,97 @@
+@main("Salesforce IFTTT Help") {
+
+    <script>
+        function switchTab(tab) {
+            Array.prototype.forEach.call( document.getElementsByClassName('slds-tabs__content'), function(tabContent) {
+                if (tabContent.id == tab) {
+                    tabContent.classList.remove('slds-hide');
+                    tabContent.classList.add('slds-show');
+                }
+                else {
+                    tabContent.classList.remove('slds-show');
+                    tabContent.classList.add('slds-hide');
+                }
+            });
+
+            Array.prototype.forEach.call( document.getElementsByClassName('slds-tabs__item'), function(tabItem) {
+                var selected = tabItem.firstChild.getAttribute('aria-controls') == tab;
+                if (selected) {
+                    tabItem.classList.add('slds-active');
+                }
+                else {
+                    tabItem.classList.remove('slds-active');
+                }
+
+                tabItem.setAttribute('aria-selected', selected);
+            });
+        }
+    </script>
+
+    <div class="slds-text-heading--large">Salesforce IFTTT Help</div>
+
+    <div class="slds-tabs--default">
+        <ul class="slds-tabs--default__nav" role="tablist">
+            <li class="slds-tabs__item slds-text-heading--label slds-active" title="Channel Setup" role="presentation"><a href="javascript:switchTab('tab-channel-setup')" role="tab" tabindex="0" aria-selected="true" aria-controls="tab-channel-setup">Channel Setup</a></li>
+            <li class="slds-tabs__item slds-text-heading--label" title="Triggers" role="presentation"><a href="javascript:switchTab('tab-triggers')" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-triggers">Triggers</a></li>
+            <li class="slds-tabs__item slds-text-heading--label" title="Actions" role="presentation"><a href="javascript:switchTab('tab-actions')" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-actions">Actions</a></li>
+            <li class="slds-tabs__item slds-text-heading--label" title="Get Help" role="presentation"><a href="javascript:switchTab('tab-get-help')" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-get-help">Get Help</a></li>
+        </ul>
+        <div id="tab-channel-setup" class="slds-tabs__content slds-text-align--left slds-show" role="tabpanel">
+            <p>
+                When you use the <a href="https://ifttt.com/salesforce">Salesforce IFTTT Channel</a> you will need to connect IFTTT with Salesforce.  IFTTT will send you to a screen that looks like:
+                <img src="@routes.Assets.at("images/activate.png")" class="screenshot">
+            </p>
+            <br/>
+            <p>
+                After selecting the login button you will be asked to login to Salesforce:
+                <img src="@routes.Assets.at("images/login.png")" class="screenshot">
+            </p>
+            <br/>
+            <p>
+                After logging into Salesforce you will need to authorize the IFTTT application:
+                <img src="@routes.Assets.at("images/authorize.png")" class="screenshot">
+                <span class="slds-text-body--small">Note: You may not have permissions to authorize this application, in which case contact your Salesforce administrator.</span>
+            </p>
+            <br/>
+            <p>
+                You can verify that you have connected IFTTT with Salesforce by checking the <a href="https://ifttt.com/salesforce">Salesforce Channel on IFTTT</a> where you should see:
+                <img src="@routes.Assets.at("images/salesforce-channel.png")" class="screenshot">
+            </p>
+            <br/>
+            <p>
+                Now you can begin using the Salesforce IFTTT Channel.  However, if you plan on using either the Custom Salesforce Trigger or the Opportunity was won Trigger then you or your Salesforce admin will need to <a href="@routes.Application.install()">install the Salesforce IFTTT Managed Package</a> into your Salesforce org.
+            </p>
+        </div>
+        <div id="tab-triggers" class="slds-tabs__content slds-text-align--left slds-text-heading--small slds-hide" role="tabpanel">
+            <p>To see how the Salesforce IFTTT Triggers work, check out these demo videos:</p>
+            <br/>
+            <h2>Opportunity was won</h2>
+            <iframe width="576" height="324" src="https://www.youtube.com/embed/45wodSiT4MY" frameborder="0" allowfullscreen></iframe>
+            <br/><br/>
+            <h2>Record Created or Updated</h2>
+            <iframe width="576" height="324" src="https://www.youtube.com/embed/oKV8EbP-xj4" frameborder="0" allowfullscreen></iframe>
+            <br/><br/>
+            <h2>Custom Salesforce Trigger</h2>
+            <iframe width="576" height="324" src="https://www.youtube.com/embed/6DcHBRD9HCc" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <div id="tab-actions" class="slds-tabs__content slds-text-align--left slds-text-heading--small slds-hide" role="tabpanel">
+            <p>To see how the Salesforce IFTTT Actions work, check out these demo videos:</p>
+            <br/>
+            <h2>Post Chatter Message</h2>
+            <iframe width="576" height="324" src="https://www.youtube.com/embed/Op--BXbB1Hw" frameborder="0" allowfullscreen></iframe>
+            <br/><br/>
+            <h2>Post Chatter File</h2>
+            <iframe width="576" height="324" src="https://www.youtube.com/embed/Xtik3YIXcRE" frameborder="0" allowfullscreen></iframe>
+            <br/><br/>
+            <h2>Post Chatter Link</h2>
+            <iframe width="576" height="324" src="https://www.youtube.com/embed/2MYiLBctIbU" frameborder="0" allowfullscreen></iframe>
+            <br/><br/>
+            <h2>Insert a Record</h2>
+            <iframe width="576" height="324" src="https://www.youtube.com/embed/GKFUrcJ37u8" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <div id="tab-get-help" class="slds-tabs__content slds-text-align--left slds-hide" role="tabpanel">
+            If you are having problems or have questions about the Salesforce IFTTT Channel, post a message in the <a href="https://success.salesforce.com/_ui/core/chatter/groups/GroupProfilePage?g=0F9300000009Q34">Salesforce IFTTT Success Chatter Group</a>.
+        </div>
+    </div>
+
+}

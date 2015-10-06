@@ -17,6 +17,10 @@ object Application extends Controller {
     Ok(views.html.install(ForceUtils.managedPackageId))
   }
 
+  def help = Action {
+    Ok(views.html.help())
+  }
+
   def errors = Action.async { request =>
     request.flash.get("enc_access_token").fold {
       val redirUrl = routes.OAuth2.authorized().absoluteURL(secure = request.secure)(request)

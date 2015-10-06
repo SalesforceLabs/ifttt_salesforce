@@ -30,6 +30,8 @@ POST        /ifttt/v1/actions/insert_a_record/fields/sobject/options            
 
 GET         /install                                                                           controllers.Application.install
 
+GET         /help                                                                              controllers.Application.help
+
 GET         /errors                                                                            controllers.Application.errors
 POST        /errors-clear                                                                      controllers.Application.errorsClear
 
