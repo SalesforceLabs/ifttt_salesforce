@@ -35,7 +35,7 @@ object OAuth2 extends Controller {
       val qs = toQs(qsMapWithRedir)
       val errorQs = toQs(qsMapWithRedir.updated("state", Seq("local-errors")))
 
-      Ok(views.html.authorize(qs, errorQs, ForceUtils.managedPackageId))
+      Ok(views.html.authorize(qs, errorQs))
     }
     else {
       Redirect(routes.Application.index())

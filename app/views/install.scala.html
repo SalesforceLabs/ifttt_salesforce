@@ -1,15 +1,5 @@
-@(managedPackageId: String)
-
 @main("Salesforce IFTTT Package") {
 
-    <div class="slds-box slds-box slds-theme--shade slds-theme--alert-texture">
-        <p>If you plan to use the <strong>Custom Salesforce Trigger</strong> or <strong>Opportunity was won</strong> Salesforce IFTTT Trigger, then you (or your Salesforce Admin) must install the Salesforce IFTTT Package.</p>
-        <br/>
-        <a href="https://login.salesforce.com/packaging/installPackage.apexp?p0=@managedPackageId" target="_blank" class="slds-button slds-button--brand">Install IFTTT Package</a>
-        <br/>
-        <br/>
-        <p>Do you want to install in a sandbox instead of a production org?</p>
-        <a href="https://test.salesforce.com/packaging/installPackage.apexp?p0=@managedPackageId" target="_blank">Install in a Sandbox</a>
-    </div>
+    @packageWarning()
 
 }

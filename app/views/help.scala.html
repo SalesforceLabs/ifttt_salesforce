@@ -37,6 +37,8 @@
             <li class="slds-tabs__item slds-text-heading--label" title="Get Help" role="presentation"><a href="javascript:switchTab('tab-get-help')" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-get-help">Get Help</a></li>
         </ul>
         <div id="tab-channel-setup" class="slds-tabs__content slds-text-align--left slds-show" role="tabpanel">
+            @packageWarning()
+            <br/>
             <p>
                 When you use the <a href="https://ifttt.com/salesforce">Salesforce IFTTT Channel</a> you will need to connect IFTTT with Salesforce.  IFTTT will send you to a screen that looks like:
                 <img src="@routes.Assets.at("images/activate.png")" class="screenshot">
@@ -59,7 +61,7 @@
             </p>
             <br/>
             <p>
-                Now you can begin using the Salesforce IFTTT Channel.  However, if you plan on using either the Custom Salesforce Trigger or the Opportunity was won Trigger then you or your Salesforce admin will need to <a href="@routes.Application.install()">install the Salesforce IFTTT Managed Package</a> into your Salesforce org.
+                Now you can begin using the Salesforce IFTTT Channel.
             </p>
         </div>
         <div id="tab-triggers" class="slds-tabs__content slds-text-align--left slds-text-heading--small slds-hide" role="tabpanel">
