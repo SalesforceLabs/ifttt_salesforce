@@ -354,7 +354,7 @@ object ForceUtils {
     case e: Exception =>
       Logger.error(e.getMessage)
       ForceUtils.saveError(auth, e.getMessage) {
-        Results.InternalServerError(Json.obj("error" -> e.getMessage))
+        Results.BadRequest(Json.obj("error" -> e.getMessage))
       }
   }
 
