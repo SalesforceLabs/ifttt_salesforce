@@ -2,6 +2,7 @@ package utils
 
 import org.specs2.specification.BeforeExample
 import play.api.Play
+import play.api.libs.json.Json
 import play.api.test.{FakeApplication, PlaySpecification}
 
 class ForceUtilsSpec extends PlaySpecification with SingleInstance {
@@ -46,6 +47,17 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
     "post a link to a user feed" in {
       val json = await(ForceUtils.chatterPostLink(authToken, "http://www.jamesward.com", None, None))
       (json._1 \ "id").asOpt[String] should beSome
+    }
+  }
+
+  "insertRecord" should {
+    "work with html fields" in {
+      val contact = Json.obj(
+        "LastName" -> "Foo",
+        "Rich_Text__c" -> "<b>test</b>"
+      )
+      val result = await(ForceUtils.insert(authToken, "Contact" , contact))
+      (result \ "id").asOpt[String] should beSome
     }
   }
   

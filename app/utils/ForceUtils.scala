@@ -255,7 +255,7 @@ object ForceUtils {
     userinfo(auth).flatMap { userInfo =>
       WS.
         url(sobjectsUrl(userInfo) + sobject).
-        withHeaders(HeaderNames.AUTHORIZATION -> auth).
+        withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).
         post(json).
         flatMap { response =>
           response.status match {
@@ -278,7 +278,7 @@ object ForceUtils {
       ForceUtils.userinfo(auth).flatMap { userinfo =>
         val url = sobjectsUrl(userinfo)
 
-        val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> auth).get()
+        val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).get()
 
         queryRequest.map { queryResponse =>
 
@@ -352,6 +352,7 @@ object ForceUtils {
       )
       Future.successful(Results.Unauthorized(json))
     case e: Exception =>
+      Logger.error(e.getMessage)
       ForceUtils.saveError(auth, e.getMessage) {
         Results.InternalServerError(Json.obj("error" -> e.getMessage))
       }
