@@ -347,7 +347,7 @@ object ForceUtils {
       )
       Future.successful(Results.Unauthorized(json))
     case fe: ForceError =>
-      Logger.error(fe.json.toString())
+      Logger.info(fe.json.toString())
       ForceUtils.saveError(auth, fe.getMessage) {
         // transform error to ifttt
         val iftttJsonResult = fe.json.transform(
