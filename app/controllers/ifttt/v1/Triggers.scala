@@ -10,6 +10,7 @@ import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.json.Reads._
 import utils.ForceUtils
+import utils.ForceUtils.ForceError
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
@@ -141,7 +142,7 @@ object Triggers extends Controller {
                 case OK =>
                   Future.successful(response)
                 case _ =>
-                  Future.failed(new Exception(response.body))
+                  Future.failed(ForceError(response.json))
               }
             }
 
@@ -158,20 +159,16 @@ object Triggers extends Controller {
               }
 
               Future.sequence(amountsFutures).flatMap { amountsSeq =>
-
                 val amounts = amountsSeq.filter(_._2.isDefined).toMap.mapValues(_.get)
 
-                val jsonResult = queryResponse.json.transform(opportunityWonQueryResultToIFTTT(instanceUrl, amounts))
-
-                jsonResult match {
-                  case JsSuccess(json, _) =>
-                    Future.successful(Ok(json))
-                  case JsError(error) =>
-                    ForceUtils.saveError(auth, error.toString()) {
-                      InternalServerError(Json.obj("error" -> error.toString))
-                    }
-                }
-
+                queryResponse.json.transform(opportunityWonQueryResultToIFTTT(instanceUrl, amounts)).fold(
+                  { _ =>
+                    Future.failed(ForceError(queryResponse.json))
+                  },
+                  { resultJson =>
+                    Future.successful(Ok(resultJson))
+                  }
+                )
               }
             }
         } recoverWith ForceUtils.standardErrorHandler(auth)
@@ -231,17 +228,14 @@ object Triggers extends Controller {
           }
 
           queryRequest.flatMap { queryResponse =>
-
-            val jsonResult = queryResponse.json.transform(iftttEventQueryResultToIFTTT)
-
-            jsonResult match {
-              case JsSuccess(json, _) =>
+            queryResponse.json.transform(iftttEventQueryResultToIFTTT).fold(
+              { _ =>
+                Future.failed(ForceError(queryResponse.json))
+              },
+              { json =>
                 Future.successful(Ok(json))
-              case JsError(error) =>
-                ForceUtils.saveError(auth, error.toString()) {
-                  InternalServerError(Json.obj("error" -> error.toString))
-                }
-            }
+              }
+            )
           }
         } recoverWith ForceUtils.standardErrorHandler(auth)
       } getOrElse Future.successful(Unauthorized)
@@ -295,21 +289,16 @@ object Triggers extends Controller {
           queryRequest.flatMap { queryResponse =>
             queryResponse.status match {
               case OK =>
-                val jsonResult = queryResponse.json.transform(anyQueryResultToIFTTT(instanceUrl))
-
-                jsonResult match {
-                  case JsSuccess(json, _) =>
+                queryResponse.json.transform(anyQueryResultToIFTTT(instanceUrl)).fold(
+                  { _ =>
+                    Future.failed(ForceError(queryResponse.json))
+                  },
+                  { json =>
                     Future.successful(Ok(json))
-                  case JsError(error) =>
-                    ForceUtils.saveError(auth,  error.toString()) {
-                      InternalServerError(Json.obj("error" -> error.toString))
-                    }
-                }
+                  }
+                )
               case _ =>
-                val error = (queryResponse.json \\ "message").headOption.flatMap(_.asOpt[String])
-                ForceUtils.saveError(auth,  error.getOrElse(queryResponse.json.toString())) {
-                  InternalServerError(Json.obj("error" -> error))
-                }
+                Future.failed(ForceError(queryResponse.json))
             }
           }
         } recoverWith ForceUtils.standardErrorHandler(auth)

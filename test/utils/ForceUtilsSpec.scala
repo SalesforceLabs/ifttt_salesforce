@@ -17,7 +17,7 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
       }
     }
   }
-  
+
   "chatterGroups" should {
     "fetch the list of chatter groups" in {
       val json = await(ForceUtils.chatterGroups(authToken))
