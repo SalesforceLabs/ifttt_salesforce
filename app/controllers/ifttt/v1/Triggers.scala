@@ -116,65 +116,44 @@ object Triggers extends Controller {
     val limit = (request.body \ "limit").asOpt[Int].getOrElse(5000)
 
     request.headers.get(AUTHORIZATION).map { auth =>
-
-      ForceUtils.userinfo(auth).flatMap { userinfo =>
-
-            val queryUrl = ForceUtils.queryUrl(userinfo)
-
-            val sobjectUrl = ForceUtils.sobjectsUrl(userinfo)
-
-            //val userId = (userinfoResponse.json \ "user_id").as[String]
-
-            //val orgId = (userinfoResponse.json \ "organization_id").as[String]
-
-            val instanceUrl = ForceUtils.instanceUrl(userinfo)
-
-            val query = s"""
-                |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c, ifttt__Related_Object_Type__c, ifttt__Related_Object_Id__c
-                |FROM ifttt__IFTTT_Event__c
-                |WHERE ifttt__Type__c = 'Opportunity Won'
-                |ORDER BY LastModifiedDate DESC
-                |LIMIT $limit
+      val query = s"""
+                     |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c, ifttt__Related_Object_Type__c, ifttt__Related_Object_Id__c
+                     |FROM ifttt__IFTTT_Event__c
+                     |WHERE ifttt__Type__c = 'Opportunity Won'
+                     |ORDER BY LastModifiedDate DESC
+                     |LIMIT $limit
               """.stripMargin
 
-            val queryRequest = WS.url(queryUrl).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get().flatMap { response =>
-              response.status match {
-                case OK =>
-                  Future.successful(response)
-                case _ =>
-                  Future.failed(ForceError(response.json))
-              }
+      ForceUtils.query(auth, query).flatMap { case (userInfo, queryResult) =>
+
+        val sobjectUrl = ForceUtils.sobjectsUrl(userInfo)
+        val instanceUrl = ForceUtils.instanceUrl(userInfo)
+
+        val amountsFutures = (queryResult \ "records").as[Seq[JsObject]].map { record =>
+          val oppId = (record \ "ifttt__Related_Object_Id__c").as[String]
+          val oppType = (record \ "ifttt__Related_Object_Type__c").as[String]
+          val url = s"$sobjectUrl$oppType/$oppId"
+
+          WS.url(url).withHeaders(AUTHORIZATION -> auth).get().map { opp =>
+            (oppId, (opp.json \ "Amount").asOpt[Int])
+          }
+        }
+
+        Future.sequence(amountsFutures).flatMap { amountsSeq =>
+          val amounts = amountsSeq.filter(_._2.isDefined).toMap.mapValues(_.get)
+
+          queryResult.transform(opportunityWonQueryResultToIFTTT(instanceUrl, amounts)).fold(
+            { _ =>
+              Future.failed(ForceError(queryResult))
+            },
+            { resultJson =>
+              Future.successful(Ok(resultJson))
             }
+          )
+        }
 
-            queryRequest.flatMap { queryResponse =>
-
-              val amountsFutures = (queryResponse.json \ "records").as[Seq[JsObject]].map { record =>
-                val oppId = (record \ "ifttt__Related_Object_Id__c").as[String]
-                val oppType = (record \ "ifttt__Related_Object_Type__c").as[String]
-                val url = s"$sobjectUrl$oppType/$oppId"
-
-                WS.url(url).withHeaders(AUTHORIZATION -> auth).get().map { opp =>
-                  (oppId, (opp.json \ "Amount").asOpt[Int])
-                }
-              }
-
-              Future.sequence(amountsFutures).flatMap { amountsSeq =>
-                val amounts = amountsSeq.filter(_._2.isDefined).toMap.mapValues(_.get)
-
-                queryResponse.json.transform(opportunityWonQueryResultToIFTTT(instanceUrl, amounts)).fold(
-                  { _ =>
-                    Future.failed(ForceError(queryResponse.json))
-                  },
-                  { resultJson =>
-                    Future.successful(Ok(resultJson))
-                  }
-                )
-              }
-            }
-        } recoverWith ForceUtils.standardErrorHandler(auth)
-
+      } recoverWith ForceUtils.standardErrorHandler(auth)
     } getOrElse Future.successful(Unauthorized)
-
   }
 
   def customSalesforceTrigger() = Action.async(parse.json) { request =>
@@ -196,47 +175,30 @@ object Triggers extends Controller {
 
       request.headers.get(AUTHORIZATION).map { auth =>
 
-        ForceUtils.userinfo(auth).flatMap { userinfo =>
-          val url = ForceUtils.queryUrl(userinfo)
+        val whereStatement = if (eventType != "") {
+          s"WHERE ifttt__Type__c = '$eventType'"
+        }
+        else {
+          ""
+        }
 
-          //val userId = (userinfoResponse.json \ "user_id").as[String]
+        val query = s"""
+          |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c
+          |FROM ifttt__IFTTT_Event__c
+          |$whereStatement
+          |ORDER BY LastModifiedDate DESC
+          |LIMIT $limit
+        """.stripMargin
 
-          //val orgId = (userinfoResponse.json \ "organization_id").as[String]
-
-          val whereStatement = if (eventType != "") {
-            s"WHERE ifttt__Type__c = '$eventType'"
-          }
-          else {
-            ""
-          }
-
-          val query = s"""
-            |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c
-            |FROM ifttt__IFTTT_Event__c
-            |$whereStatement
-            |ORDER BY LastModifiedDate DESC
-            |LIMIT $limit
-          """.stripMargin
-
-          val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get().flatMap { response =>
-            response.status match {
-              case OK =>
-                Future.successful(response)
-              case _ =>
-                Future.failed(new Exception(response.body))
+        ForceUtils.query(auth, query).flatMap { case (userInfo, queryResult) =>
+          queryResult.transform(iftttEventQueryResultToIFTTT).fold(
+            { _ =>
+              Future.failed(ForceError(queryResult))
+            },
+            { json =>
+              Future.successful(Ok(json))
             }
-          }
-
-          queryRequest.flatMap { queryResponse =>
-            queryResponse.json.transform(iftttEventQueryResultToIFTTT).fold(
-              { _ =>
-                Future.failed(ForceError(queryResponse.json))
-              },
-              { json =>
-                Future.successful(Ok(json))
-              }
-            )
-          }
+          )
         } recoverWith ForceUtils.standardErrorHandler(auth)
       } getOrElse Future.successful(Unauthorized)
     }
@@ -264,43 +226,30 @@ object Triggers extends Controller {
 
       request.headers.get(AUTHORIZATION).map { auth =>
 
-        ForceUtils.userinfo(auth).flatMap { userinfo =>
-          val url = ForceUtils.queryUrl(userinfo)
+        val whereStatement = if (queryCriteria != "") {
+          s"WHERE $queryCriteria"
+        }
+        else {
+          ""
+        }
 
-          val instanceUrl = ForceUtils.instanceUrl(userinfo)
+        val query = s"""
+          |SELECT Id, LastModifiedDate
+          |FROM $sobject
+          |$whereStatement
+          |ORDER BY LastModifiedDate DESC
+          |LIMIT $limit
+        """.stripMargin
 
-          val whereStatement = if (queryCriteria != "") {
-            s"WHERE $queryCriteria"
-          }
-          else {
-            ""
-          }
-
-          val query = s"""
-            |SELECT Id, LastModifiedDate
-            |FROM $sobject
-            |$whereStatement
-            |ORDER BY LastModifiedDate DESC
-            |LIMIT $limit
-          """.stripMargin
-
-          val queryRequest = WS.url(url).withHeaders(AUTHORIZATION -> auth).withQueryString("q" -> query).get()
-
-          queryRequest.flatMap { queryResponse =>
-            queryResponse.status match {
-              case OK =>
-                queryResponse.json.transform(anyQueryResultToIFTTT(instanceUrl)).fold(
-                  { _ =>
-                    Future.failed(ForceError(queryResponse.json))
-                  },
-                  { json =>
-                    Future.successful(Ok(json))
-                  }
-                )
-              case _ =>
-                Future.failed(ForceError(queryResponse.json))
+        ForceUtils.query(auth, query).flatMap { case (userInfo, queryResult) =>
+          queryResult.transform(anyQueryResultToIFTTT(ForceUtils.instanceUrl(userInfo))).fold(
+            { _ =>
+              Future.failed(ForceError(queryResult))
+            },
+            { json =>
+              Future.successful(Ok(json))
             }
-          }
+          )
         } recoverWith ForceUtils.standardErrorHandler(auth)
       } getOrElse Future.successful(Unauthorized)
     }

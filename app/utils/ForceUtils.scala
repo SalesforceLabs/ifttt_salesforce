@@ -317,6 +317,23 @@ object ForceUtils {
     }
   }
 
+  def query(auth: String, soql: String): Future[(JsValue, JsValue)] = {
+    userinfo(auth).flatMap { userInfo =>
+      WS.url(queryUrl(userInfo))
+        .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+        .withQueryString("q" -> soql)
+        .get()
+        .flatMap { response =>
+          response.status match {
+            case Status.OK =>
+              Future.successful(userInfo, response.json)
+            case _ =>
+              Future.failed(ForceError(response.json))
+          }
+        }
+    }
+  }
+
 
   def queryUrl(value: JsValue) = (value \ "urls" \ "query").as[String].replace("{version}", API_VERSION)
 
@@ -350,18 +367,15 @@ object ForceUtils {
       Logger.info(fe.getMessage)
       ForceUtils.saveError(auth, fe.getMessage) {
         // transform error to ifttt
-        val iftttJsonResult = fe.json.transform(
-          (__ \ 'status).json.copyFrom(
-            (__ \ 'errorCode).json.pick
+        Results.BadRequest(
+          Json.obj("errors" ->
+            fe.json.as[Seq[JsObject]].map { error =>
+              Json.obj(
+                "status" -> (error \ "errorCode"),
+                "message" -> (error \ "message")
+              )
+            }
           )
-        )
-
-        iftttJsonResult.fold(
-          { _ =>
-            Results.InternalServerError(fe.json)
-          }, { iftttJson =>
-            Results.BadRequest(Json.obj("errors" -> iftttJson))
-          }
         )
       }
     case e: Exception =>

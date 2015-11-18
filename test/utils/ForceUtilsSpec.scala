@@ -6,6 +6,8 @@ import play.api.libs.json.Json
 import play.api.test.{FakeApplication, PlaySpecification}
 import utils.ForceUtils.ForceError
 
+import scala.util.Try
+
 class ForceUtilsSpec extends PlaySpecification with SingleInstance {
 
   implicit val app: FakeApplication = FakeApplication()
@@ -81,6 +83,29 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
         )
       )
       await(ForceUtils.insert(authToken, "Contact" , contact)) should throwA[ForceError](error)
+    }
+  }
+
+  "query" should {
+    "work with a valid query" in {
+      val result = await(ForceUtils.query(authToken, "SELECT Id FROM Contact"))
+      (result._2 \ "totalSize").as[Int] should beGreaterThan (0)
+    }
+    "not work with in invalid query" in {
+      val error = ForceError(
+        Json.obj(
+          "errors" -> Json.arr(
+            Json.obj(
+              "status" -> "FOO"
+            )
+          )
+        )
+      )
+      val result = Try(await(ForceUtils.query(authToken, "FOO")))
+
+      result should beAFailedTry.withThrowable[ForceError]
+
+      (result.failed.get.asInstanceOf[ForceError].json \\ "errorCode").seq.map(_.as[String]) should beEqualTo (Seq("MALFORMED_QUERY"))
     }
   }
   
