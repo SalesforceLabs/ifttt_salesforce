@@ -1,21 +1,16 @@
 package utils
 
-import java.io.{OutputStream, IOException, BufferedInputStream, InputStream}
-import java.net.{HttpURLConnection, URL}
-
 import com.ning.http.client._
 import com.ning.http.multipart.FilePart
 import com.ning.http.multipart.Part
 import com.ning.http.multipart.StringPart
 import com.ning.http.multipart._
 import org.apache.commons.codec.digest.DigestUtils
-import play.api.libs.MimeTypes
-import play.api.libs.iteratee.Iteratee
 import play.api.libs.ws.ning.NingWSResponse
 import play.api.{Play, Logger}
 import play.api.http.{ContentTypes, Status, HeaderNames}
-import play.api.libs.json.{JsArray, Json, JsObject, JsValue}
-import play.api.libs.ws.{WSResponseHeaders, WSResponse, WS}
+import play.api.libs.json._
+import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
 import play.api.mvc._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -47,7 +42,7 @@ object ForceUtils {
           case Status.UNAUTHORIZED | Status.FORBIDDEN =>
             Future.failed(UnauthorizedException(userInfoResponse.body))
           case _ =>
-            Future.failed(new Exception(userInfoResponse.body))
+            Future.failed(ForceError(userInfoResponse.json))
         }
       }
     }
@@ -76,7 +71,7 @@ object ForceUtils {
     WS.url(loginUrl(env)).post(body).flatMap { response =>
       response.status match {
         case Status.OK => Future.successful(response.json)
-        case _ => Future.failed(new Exception(response.body))
+        case _ => Future.failed(ForceError(response.json))
       }
     }
 
@@ -111,7 +106,7 @@ object ForceUtils {
             case Status.CREATED =>
               Future.successful(createResponse.json, instanceUrl)
             case _ =>
-              Future.failed(new Exception(s"Could not post on Chatter: ${createResponse.body}"))
+              Future.failed(ForceError(createResponse.json))
           }
         }
     }
@@ -158,7 +153,7 @@ object ForceUtils {
           case Status.CREATED =>
             Future.successful(createResponse.json, instanceUrl)
           case _ =>
-            Future.failed(new Exception(s"Could not post on Chatter: ${createResponse.body}"))
+            Future.failed(ForceError(createResponse.json))
         }
       }
     }
@@ -244,7 +239,7 @@ object ForceUtils {
             case Status.CREATED =>
               Future.successful(createResponse.json, instanceUrl)
             case _ =>
-              Future.failed(new Exception(s"Could not post on Chatter: ${createResponse.body}"))
+              Future.failed(ForceError(createResponse.json))
           }
         }
       }
@@ -262,7 +257,7 @@ object ForceUtils {
             case Status.CREATED =>
               Future.successful(response.json)
             case _ =>
-              Future.failed(new Exception(s"Could not insert a record: ${response.body}"))
+              Future.failed(ForceError(response.json))
           }
         }
     }
@@ -316,7 +311,7 @@ object ForceUtils {
           case Status.OK =>
             Future.successful((response.json \ "groups").as[JsArray])
           case _ =>
-            Future.failed(new Exception(s"Could not get Chatter groups: ${response.body}"))
+            Future.failed(ForceError(response.json))
         }
       }
     }
@@ -351,6 +346,24 @@ object ForceUtils {
         )
       )
       Future.successful(Results.Unauthorized(json))
+    case fe: ForceError =>
+      Logger.error(fe.json.toString())
+      ForceUtils.saveError(auth, fe.getMessage) {
+        // transform error to ifttt
+        val iftttJsonResult = fe.json.transform(
+          (__ \ 'status).json.copyFrom(
+            (__ \ 'errorCode).json.pick
+          )
+        )
+
+        iftttJsonResult.fold(
+          { _ =>
+            Results.InternalServerError(fe.json)
+          }, { iftttJson =>
+            Results.BadRequest(Json.obj("errors" -> iftttJson))
+          }
+        )
+      }
     case e: Exception =>
       Logger.error(e.getMessage)
       ForceUtils.saveError(auth, e.getMessage) {
@@ -360,6 +373,12 @@ object ForceUtils {
 
   case class UnauthorizedException(message: String) extends Exception {
     override def getMessage = message
+  }
+
+  case class ForceError(json: JsValue) extends Exception {
+    override def getMessage = {
+      (json \\ "message").map(_.as[String]).mkString
+    }
   }
 
 }

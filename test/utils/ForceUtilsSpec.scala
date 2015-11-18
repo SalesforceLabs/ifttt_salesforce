@@ -4,6 +4,7 @@ import org.specs2.specification.BeforeExample
 import play.api.Play
 import play.api.libs.json.Json
 import play.api.test.{FakeApplication, PlaySpecification}
+import utils.ForceUtils.ForceError
 
 class ForceUtilsSpec extends PlaySpecification with SingleInstance {
 
@@ -58,6 +59,19 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
       )
       val result = await(ForceUtils.insert(authToken, "Contact" , contact))
       (result \ "id").asOpt[String] should beSome
+    }
+    "fail without the required fields" in {
+      val contact = Json.obj("FirstName" -> "Foo")
+      val error = ForceError(
+        Json.obj(
+          "errors" -> Json.arr(
+            Json.obj(
+              "message" -> "Required fields are missing: [LastName]"
+            )
+          )
+        )
+      )
+      await(ForceUtils.insert(authToken, "Contact" , contact)) should throwA[ForceError](error)
     }
   }
   
