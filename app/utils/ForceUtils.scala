@@ -275,20 +275,27 @@ object ForceUtils {
 
         val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).get()
 
-        queryRequest.map { queryResponse =>
+        queryRequest.flatMap { queryResponse =>
 
-          val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
+          queryResponse.status match {
+            case Status.OK =>
+              val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
 
-          // todo: use a JSON transformer
-          val options = sobjects.filter(_.\(filter).as[Boolean]).map { json =>
-            Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
-          } sortBy (_.\("label").as[String])
+              // todo: use a JSON transformer
+              val options = sobjects.filter(_.\(filter).as[Boolean]).map { json =>
+                Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
+              } sortBy (_.\("label").as[String])
 
-          Results.Ok(
-            Json.obj(
-              "data" -> options
-            )
-          )
+              Future.successful(
+                Results.Ok(
+                  Json.obj(
+                    "data" -> options
+                  )
+                )
+              )
+            case _ =>
+              Future.failed(ForceError(queryResponse.json))
+          }
         }
       } recoverWith standardErrorHandler(auth)
     }
@@ -364,6 +371,8 @@ object ForceUtils {
       )
       Future.successful(Results.Unauthorized(json))
     case fe: ForceError =>
+      Logger.info(fe.getStackTrace.mkString)
+      Logger.info(fe.json.toString)
       Logger.info(fe.getMessage)
       ForceUtils.saveError(auth, fe.getMessage) {
         // transform error to ifttt
@@ -379,9 +388,10 @@ object ForceUtils {
         )
       }
     case e: Exception =>
+      Logger.error(e.getStackTrace.mkString)
       Logger.error(e.getMessage)
       ForceUtils.saveError(auth, e.getMessage) {
-        Results.BadRequest(Json.obj("error" -> e.getMessage))
+        Results.InternalServerError(Json.obj("error" -> e.getMessage))
       }
   }
 

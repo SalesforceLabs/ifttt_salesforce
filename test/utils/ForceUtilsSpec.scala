@@ -19,7 +19,7 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
       }
     }
   }
-
+  
   "chatterGroups" should {
     "fetch the list of chatter groups" in {
       val json = await(ForceUtils.chatterGroups(authToken))
@@ -69,6 +69,14 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
         "Body" -> "<b>test</b>"
       )
       val result = await(ForceUtils.insert(authToken, "Note" , note))
+      (result \ "id").asOpt[String] should beSome
+    }
+    "work with a ContentNote" in {
+      val contentNote = Json.obj(
+        "Title" -> "Foo",
+        "Content" -> "<b>Foo</b>"
+      )
+      val result = await(ForceUtils.insert(authToken, "ContentNote" , contentNote))
       (result \ "id").asOpt[String] should beSome
     }
     "fail without the required fields" in {
