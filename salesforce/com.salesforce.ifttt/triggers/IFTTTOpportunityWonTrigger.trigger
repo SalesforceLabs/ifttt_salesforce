@@ -1,5 +1,10 @@
 trigger IFTTTOpportunityWonTrigger on Opportunity (after insert, after update) {
 
+    // set the http mock when running in a test
+    if (Test.isRunningTest()) {
+        Test.setMock(HttpCalloutMock.class, new HttpCalloutMockImpl());
+    }
+
     String url = 'http://ifttt-salesforce.herokuapp.com/ifttt/v1/webhook/opportunity_was_won';
 
     String content = Webhook.jsonContent(Trigger.new, Trigger.old);

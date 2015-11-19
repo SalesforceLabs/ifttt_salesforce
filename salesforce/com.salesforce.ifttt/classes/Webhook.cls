@@ -12,7 +12,7 @@ public class Webhook {
         }
 
         String userId = JSON.serialize(UserInfo.getUserId());
-        
+
         String orgId = JSON.serialize(UserInfo.getOrganizationId());
 
         String content = '{"new": ' + newObjects + ', "old": ' + oldObjects + ', "userId": ' + userId + ', "orgId": ' + orgId + '}';
@@ -21,7 +21,6 @@ public class Webhook {
 
     @future(callout=true)
     public static void callout(String url, String content) {
-
         Http h = new Http();
 
         HttpRequest req = new HttpRequest();

@@ -44,3 +44,15 @@ To setup a local development environment do the following:
     * Create 3 new Opportunities with a `Closed/Won` status
     * Create 3 new `IFTTT Events` objects with the `type` field set to `test`
 1. Run the IFTTT Channel Endpoint Test
+
+
+Salesforce Metadata
+-------------------
+
+Fetch the metadata:
+
+    SALESFORCE_USERNAME=foo@bar.com SALESFORCE_PASSWORD=password ./activator force:fetch
+
+Deploy the metadata:
+
+    SALESFORCE_USERNAME=foo@bar.com SALESFORCE_PASSWORD=password ./activator force:deploy

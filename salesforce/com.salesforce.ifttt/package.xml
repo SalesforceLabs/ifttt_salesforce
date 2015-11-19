@@ -4,6 +4,7 @@
     <apiAccessLevel>Unrestricted</apiAccessLevel>
     <namespacePrefix>ifttt</namespacePrefix>
     <types>
+        <members>HttpCalloutMockImpl</members>
         <members>IFTTTEventTriggerTest</members>
         <members>IFTTTOpportunityWonTriggerTest</members>
         <members>Webhook</members>
