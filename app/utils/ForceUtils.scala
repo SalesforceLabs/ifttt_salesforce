@@ -15,6 +15,7 @@ import play.api.Play.current
 import play.api.mvc._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Promise, Future}
+import scala.util.Try
 
 object ForceUtils {
 
@@ -42,7 +43,8 @@ object ForceUtils {
           case Status.UNAUTHORIZED | Status.FORBIDDEN =>
             Future.failed(UnauthorizedException(userInfoResponse.body))
           case _ =>
-            Future.failed(ForceError(userInfoResponse.json))
+            val jsonTry = Try(userInfoResponse.json)
+            Future.failed(jsonTry.map(ForceError).getOrElse(new Exception("Could not get user info: " + userInfoResponse.body)))
         }
       }
     }
