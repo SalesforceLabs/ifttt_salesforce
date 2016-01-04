@@ -17,6 +17,10 @@ class AdaptersSpec extends Specification with JsonMatchers {
     "not transform text" in {
       Adapters.anyJsValueToSalesforce(JsString("hello, world")).asOpt[String] must beSome("hello, world")
     }
+    "transform booleans" in {
+      Adapters.anyJsValueToSalesforce(JsString("true")).asOpt[Boolean] must beSome(true)
+      Adapters.anyJsValueToSalesforce(JsString("false")).asOpt[Boolean] must beSome(false)
+    }
   }
 
 }
