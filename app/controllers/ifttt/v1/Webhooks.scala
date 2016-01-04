@@ -2,15 +2,13 @@ package controllers.ifttt.v1
 
 import java.net.URL
 
-import play.api.Play
+import play.api.Play.current
 import play.api.libs.json.Json
 import play.api.libs.ws.WS
 import play.api.mvc.{Action, Controller}
-import play.api.Play.current
 import utils.Global
-import scala.concurrent.ExecutionContext.Implicits.global
 
-import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object Webhooks extends Controller {
 

@@ -1,13 +1,62 @@
 package utils
 
-import org.junit.runner.RunWith
 import org.specs2.matcher.JsonMatchers
 import org.specs2.mutable._
-import org.specs2.runner._
-import play.api.libs.json.JsString
+import play.api.libs.json.{JsObject, JsString, Json}
 
-@RunWith(classOf[JUnitRunner])
+import scala.util.parsing.json.{JSONArray, JSONObject}
+
 class AdaptersSpec extends Specification with JsonMatchers {
+
+  "opportunityWonQueryResultToIFTTT" should {
+    "transform salesforce records into ifttt trigger data" in {
+
+      val queryResult = Json.parse(
+        """{"totalSize":1,
+          |  "done":true,
+          |  "records":[
+          |    {
+          |      "attributes": {"type":"Opportunity","url":"/services/data/v30.0/sobjects/Opportunity/006o0000002el8xAAA"},
+          |      "Id":"006o0000002el8xAAA",
+          |      "Name":"asdf",
+          |      "Amount":null,
+          |      "LastModifiedDate":"2014-07-02T15:55:32.000+0000",
+          |      "Owner": {
+          |        "Name": "Jon Doe"
+          |      }
+          |    }
+          |  ]
+          |}""".stripMargin)
+
+      val actualIFTTTResponse = queryResult.transform(Adapters.opportunityWonQueryResultToIFTTT("")).asEither
+
+      actualIFTTTResponse must beRight { json: JsObject =>
+
+        json.toString must /(
+          "data" -> JSONArray(
+            List(
+              JSONObject(
+                Map(
+                  "amount" -> "$0",
+                  "name" -> "asdf",
+                  "link_to_opportunity" -> "006o0000002el8xAAA",
+                  "timestamp" -> "2014-07-02T09:55:32.000-06:00",
+                  "owner_name" -> "Jon Doe",
+                  "meta" -> JSONObject(
+                    Map(
+                      "id" -> "006o0000002el8xAAA",
+                      "timestamp" -> 1404316532D
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      }
+
+    }
+  }
 
   "anyJsValueToSalesforce" should {
     "transform a google date" in {

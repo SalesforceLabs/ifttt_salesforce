@@ -1,20 +1,18 @@
 package utils
 
 import com.ning.http.client._
-import com.ning.http.multipart.FilePart
-import com.ning.http.multipart.Part
-import com.ning.http.multipart.StringPart
-import com.ning.http.multipart._
+import com.ning.http.multipart.{FilePart, Part, StringPart, _}
 import org.apache.commons.codec.digest.DigestUtils
-import play.api.libs.ws.ning.NingWSResponse
-import play.api.{Play, Logger}
-import play.api.http.{ContentTypes, Status, HeaderNames}
-import play.api.libs.json._
-import play.api.libs.ws.{WSResponse, WS}
 import play.api.Play.current
+import play.api.http.{ContentTypes, HeaderNames, Status}
+import play.api.libs.json._
+import play.api.libs.ws.ning.NingWSResponse
+import play.api.libs.ws.{WS, WSResponse}
 import play.api.mvc._
+import play.api.{Logger, Play}
+
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Promise, Future}
+import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
 object ForceUtils {
@@ -326,23 +324,32 @@ object ForceUtils {
     }
   }
 
-  def query(auth: String, soql: String): Future[(JsValue, JsValue)] = {
-    userinfo(auth).flatMap { userInfo =>
-      WS.url(queryUrl(userInfo))
-        .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
-        .withQueryString("q" -> soql)
-        .get()
-        .flatMap { response =>
-          response.status match {
-            case Status.OK =>
-              Future.successful(userInfo, response.json)
-            case _ =>
-              Future.failed(ForceError(response.json))
-          }
+  def query(auth: String, userInfo: JsValue, soql: String): Future[JsValue] = {
+    WS.url(queryUrl(userInfo))
+      .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+      .withQueryString("q" -> soql)
+      .get()
+      .flatMap { response =>
+        response.status match {
+          case Status.OK =>
+            Future.successful(response.json)
+          case _ =>
+            Future.failed(ForceError(response.json))
         }
-    }
+      }
   }
 
+  def opportunitiesWon(auth: String, userInfo: JsValue, limit: Int): Future[JsObject] = {
+    val soql = s"""
+                   |SELECT Id, LastModifiedDate, Name, Amount, Owner.Name
+                   |FROM Opportunity
+                   |WHERE IsWon = TRUE
+                   |ORDER BY LastModifiedDate DESC
+                   |LIMIT $limit
+                """.stripMargin
+
+    query(auth, userInfo, soql).map(_.as[JsObject])
+  }
 
   def queryUrl(value: JsValue) = (value \ "urls" \ "query").as[String].replace("{version}", API_VERSION)
 

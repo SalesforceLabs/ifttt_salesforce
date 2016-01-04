@@ -1,8 +1,7 @@
 package utils
 
-import org.specs2.specification.BeforeExample
 import play.api.Play
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import play.api.test.{FakeApplication, PlaySpecification}
 import utils.ForceUtils.ForceError
 
@@ -19,7 +18,9 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
       }
     }
   }
-  
+
+  lazy val userInfo = await(ForceUtils.userinfo(authToken))
+
   "chatterGroups" should {
     "fetch the list of chatter groups" in {
       val json = await(ForceUtils.chatterGroups(authToken))
@@ -96,8 +97,8 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
 
   "query" should {
     "work with a valid query" in {
-      val result = await(ForceUtils.query(authToken, "SELECT Id FROM Contact"))
-      (result._2 \ "totalSize").as[Int] should beGreaterThan (0)
+      val result = await(ForceUtils.query(authToken, userInfo, "SELECT Id FROM Contact"))
+      (result \ "totalSize").as[Int] should beGreaterThan (0)
     }
     "not work with in invalid query" in {
       val error = ForceError(
@@ -109,20 +110,21 @@ class ForceUtilsSpec extends PlaySpecification with SingleInstance {
           )
         )
       )
-      val result = Try(await(ForceUtils.query(authToken, "FOO")))
+      val result = Try(await(ForceUtils.query(authToken, userInfo, "FOO")))
 
       result should beAFailedTry.withThrowable[ForceError]
 
       (result.failed.get.asInstanceOf[ForceError].json \\ "errorCode").seq.map(_.as[String]) should beEqualTo (Seq("MALFORMED_QUERY"))
     }
   }
+
+  "opportunitiesWon" should {
+    "get 1 opportunity won" in {
+      val result = await(ForceUtils.opportunitiesWon(authToken, userInfo, 1))
+      (result \ "records").as[Seq[JsObject]].length should beEqualTo (1)
+      ((result \ "records").as[Seq[JsObject]].head \ "Name").asOpt[String] should beSome ("Big Deal")
+      ((result \ "records").as[Seq[JsObject]].head \ "Owner" \ "Name").asOpt[String] should beSome ("IFTTT Test")
+    }
+  }
   
 }
-
-trait SingleInstance extends BeforeExample {
-  def before {
-    if (Play.unsafeApplication == null) Play.start(App)
-  }
-}
-
-object App extends FakeApplication()

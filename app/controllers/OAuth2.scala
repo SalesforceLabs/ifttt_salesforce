@@ -1,15 +1,14 @@
 package controllers
 
 import org.apache.commons.codec.digest.DigestUtils
-import play.api.Play
+import play.api.Play.current
 import play.api.libs.Crypto
+import play.api.libs.json.Reads._
+import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
-import play.api.Play.current
-import play.api.libs.json._
-import play.api.libs.json.Reads._
-import play.api.libs.functional.syntax._
 import utils.{ForceUtils, Global}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 

@@ -1,7 +1,7 @@
 package controllers.ifttt.v1
 
 import play.api.Play
-import play.api.mvc.{Controller, Action}
+import play.api.mvc.{Action, Controller}
 
 object Application extends Controller {
 

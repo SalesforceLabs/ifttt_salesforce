@@ -5,8 +5,8 @@ import play.api.libs.json._
 import play.api.mvc.{Action, Controller}
 import utils.{Adapters, ForceUtils}
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object Actions extends Controller {
 

@@ -4,8 +4,8 @@ import play.api.libs.Crypto
 import play.api.mvc.{Action, Controller}
 import utils.{ForceUtils, Global}
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object Application extends Controller {
 

@@ -3,10 +3,8 @@ package utils
 import java.net.URI
 
 import play.api.libs.concurrent.Akka
-import play.api.{Play, Application, GlobalSettings}
+import play.api.{Application, GlobalSettings, Play}
 import redis.RedisClient
-
-import scala.util.Try
 
 object Global extends GlobalSettings {
 
