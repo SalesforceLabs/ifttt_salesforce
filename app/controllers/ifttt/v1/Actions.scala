@@ -3,12 +3,22 @@ package controllers.ifttt.v1
 import play.api.libs.json.Reads._
 import play.api.libs.json._
 import play.api.mvc.{Action, Controller}
-import utils.{Adapters, Force}
+import utils.{ForceIFTTT, Adapters, Force}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object Actions extends Controller {
+
+  private def maybeCommunityGroup(maybeValue: Option[String]): (Option[String], Option[String]) = {
+    maybeValue.fold(Option.empty[String], Option.empty[String]) { value =>
+      value.split(':') match {
+        case Array(communityId, groupId) => (Some(communityId), Some(groupId))
+        case Array(groupId) => (None, Some(groupId))
+        case _ => (None, None)
+      }
+    }
+  }
 
   def postMessageOnChatter = Action.async(parse.json) { request =>
     request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
@@ -27,10 +37,10 @@ object Actions extends Controller {
       }
 
       val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String].filterNot(_.isEmpty)
-      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String].filterNot(_.isEmpty)
+      val (maybeCommunityId, maybeGroupId) = maybeCommunityGroup((request.body \ "actionFields" \ "group").asOpt[String])
 
       maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
-        Force.chatterPostMessage(auth, message, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+        Force.chatterPostMessage(auth, message, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
       } recoverWith Force.standardErrorHandler(auth)
     }
   }
@@ -52,13 +62,13 @@ object Actions extends Controller {
       }
 
       val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String].filterNot(_.isEmpty)
-      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String].filterNot(_.isEmpty)
+      val (maybeCommunityId, maybeGroupId) = maybeCommunityGroup((request.body \ "actionFields" \ "group").asOpt[String])
       val maybeFileUrl = (request.body \ "actionFields" \ "file_url").asOpt[String]
       val maybeFileName = (request.body \ "actionFields" \ "file_name").asOpt[String]
 
       val resultFuture = (maybeFileUrl, maybeFileName) match {
         case (Some(fileUrl), Some(fileName)) =>
-          Force.chatterPostFile(auth, fileUrl, fileName, maybeMessage, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+          Force.chatterPostFile(auth, fileUrl, fileName, maybeMessage, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
         case _ =>
           Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Both the File URL and File Name are required")))
       }
@@ -85,11 +95,11 @@ object Actions extends Controller {
       }
 
       val maybeMessage = (request.body \ "actionFields" \ "message").asOpt[String].filterNot(_.isEmpty)
-      val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String].filterNot(_.isEmpty)
+      val (maybeCommunityId, maybeGroupId) = maybeCommunityGroup((request.body \ "actionFields" \ "group").asOpt[String])
       val maybeLinkUrl = (request.body \ "actionFields" \ "link").asOpt[String]
 
       maybeLinkUrl.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "The link is required")))) { linkUrl =>
-        Force.chatterPostLink(auth, linkUrl, maybeMessage, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+        Force.chatterPostLink(auth, linkUrl, maybeMessage, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
       } recoverWith Force.standardErrorHandler(auth)
     }
   }
@@ -131,18 +141,7 @@ object Actions extends Controller {
 
   def postOnChatterFieldsGroupOptions() = Action.async(parse.json) { request =>
     request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
-      Force.chatterGroups(auth).map { groups =>
-
-        val options = groups.value.map { group =>
-          Json.obj("label" -> (group \ "name").as[String], "value" -> (group \ "id").as[String])
-        } sortBy (_.\("label").as[String])
-
-        Ok(
-          Json.obj(
-            "data" -> options
-          )
-        )
-      }  recoverWith Force.standardErrorHandler(auth)
+      ForceIFTTT.allGroups(auth).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
     }
   }
 

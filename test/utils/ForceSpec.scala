@@ -23,11 +23,12 @@ class ForceSpec extends PlaySpecification with SingleInstance {
 
   "chatterGroups" should {
     "fetch the list of chatter groups" in {
-      val json = await(Force.chatterGroups(authToken))
+      val json = await(Force.chatterGroups(authToken, userInfo))
       json.value.size should beGreaterThan (0)
     }
   }
 
+  /*
   "chatterPostMessage" should {
     "post to a user feed" in {
       val json = await(Force.chatterPostMessage(authToken, "test", None))
@@ -124,6 +125,21 @@ class ForceSpec extends PlaySpecification with SingleInstance {
       (result \ "records").as[Seq[JsObject]].length should beEqualTo (1)
       ((result \ "records").as[Seq[JsObject]].head \ "Name").asOpt[String] should beSome ("Big Deal")
       ((result \ "records").as[Seq[JsObject]].head \ "Owner" \ "Name").asOpt[String] should beSome ("IFTTT Test")
+    }
+  }
+  */
+
+  "communities" should {
+    "get a list of communities" in {
+      val result = await(Force.communities(authToken, userInfo))
+      result.value.length should beGreaterThan (0)
+    }
+  }
+
+  "communityGroups" should {
+    "get a list of groups in a community" in {
+      val result = await(Force.communityGroups(authToken, userInfo, "0DBj0000000L0F3GAK"))
+      result.value.length should beGreaterThan (0)
     }
   }
   

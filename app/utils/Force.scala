@@ -77,13 +77,15 @@ object Force {
 
   }
 
-  def chatterPostMessage(auth: String, message: String, groupId: Option[String]): Future[(JsValue, String)] = {
+  private def feedUrl(userInfo: JsValue, maybeCommunityId: Option[String]): String = {
+    val path = maybeCommunityId.fold("chatter/feed-elements")(communityId => s"connect/communities/$communityId/chatter/feed-elements")
+    restUrl(userInfo) + path
+  }
+
+  def chatterPostMessage(auth: String, message: String, maybeCommunityId: Option[String], groupId: Option[String]): Future[(JsValue, String)] = {
     userinfo(auth).flatMap { userInfo =>
       val userId = (userInfo \ "user_id").as[String]
       val subjectId = groupId.getOrElse(userId)
-      val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
-      val restUrl = (userInfo \ "urls" \ "rest").as[String].replace("{version}", API_VERSION)
-      val url = restUrl + "chatter/feed-elements"
 
       val json = Json.obj(
         "body" -> Json.obj(
@@ -98,13 +100,13 @@ object Force {
         "subjectId" -> subjectId
       )
 
-      WS.url(url)
+      WS.url(feedUrl(userInfo, maybeCommunityId))
         .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
         .post(json)
         .flatMap { createResponse =>
           createResponse.status match {
             case Status.CREATED =>
-              Future.successful(createResponse.json, instanceUrl)
+              Future.successful(createResponse.json, instanceUrl(userInfo))
             case _ =>
               Future.failed(ForceError(createResponse.json))
           }
@@ -112,13 +114,10 @@ object Force {
     }
   }
 
-  def chatterPostLink(auth: String, linkUrl: String, maybeMessage: Option[String], maybeGroup: Option[String]): Future[(JsValue, String)] = {
+  def chatterPostLink(auth: String, linkUrl: String, maybeMessage: Option[String], maybeCommunityId: Option[String], maybeGroup: Option[String]): Future[(JsValue, String)] = {
     userinfo(auth).flatMap { userInfo =>
       val userId = (userInfo \ "user_id").as[String]
       val subjectId = maybeGroup.getOrElse(userId)
-      val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
-      val restUrl = (userInfo \ "urls" \ "rest").as[String].replace("{version}", API_VERSION)
-      val url = restUrl + "chatter/feed-elements"
 
       val json = Json.obj(
         "capabilities" -> Json.obj(
@@ -145,13 +144,13 @@ object Force {
         json ++ body
       }
 
-      WS.url(url)
+      WS.url(feedUrl(userInfo, maybeCommunityId))
         .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
         .post(jsonWithMaybeMessage)
         .flatMap { createResponse =>
         createResponse.status match {
           case Status.CREATED =>
-            Future.successful(createResponse.json, instanceUrl)
+            Future.successful(createResponse.json, instanceUrl(userInfo))
           case _ =>
             Future.failed(ForceError(createResponse.json))
         }
@@ -192,16 +191,13 @@ object Force {
   }
 
   // todo: max file size
-  def chatterPostFile(auth: String, fileUrl: String, fileName: String, maybeMessage: Option[String], maybeGroup: Option[String]): Future[(JsValue, String)] = {
+  def chatterPostFile(auth: String, fileUrl: String, fileName: String, maybeMessage: Option[String], maybeCommunityId: Option[String], maybeGroup: Option[String]): Future[(JsValue, String)] = {
     userinfo(auth).flatMap { userInfo =>
       WS.url(fileUrl).get().flatMap { response =>
         val fileBytes = response.underlying[com.ning.http.client.Response].getResponseBodyAsBytes
 
         val userId = (userInfo \ "user_id").as[String]
         val subjectId = maybeGroup.getOrElse(userId)
-        val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
-        val restUrl = (userInfo \ "urls" \ "rest").as[String].replace("{version}", API_VERSION)
-        val url = restUrl + "chatter/feed-elements"
 
         val json = Json.obj(
           "capabilities" -> Json.obj(
@@ -234,10 +230,10 @@ object Force {
 
         val filePart = new FilePart("feedElementFileUpload", filePartSource)
 
-        postMultiPart(url, Seq(HeaderNames.AUTHORIZATION -> bearerAuth(auth)), Seq(jsonPart, filePart)).flatMap { createResponse =>
+        postMultiPart(feedUrl(userInfo, maybeCommunityId), Seq(HeaderNames.AUTHORIZATION -> bearerAuth(auth)), Seq(jsonPart, filePart)).flatMap { createResponse =>
           createResponse.status match {
             case Status.CREATED =>
-              Future.successful(createResponse.json, instanceUrl)
+              Future.successful(createResponse.json, instanceUrl(userInfo))
             case _ =>
               Future.failed(ForceError(createResponse.json))
           }
@@ -301,25 +297,21 @@ object Force {
     }
   }
 
-  def chatterGroups(auth: String): Future[JsArray] = {
+  def chatterGroups(auth: String, userInfo: JsValue): Future[JsArray] = {
     // /chatter/users/userId/groups
-    userinfo(auth).flatMap { userInfo =>
-      val userId = (userInfo \ "user_id").as[String]
-      val instanceUrl = (userInfo \ "profile").as[String].stripSuffix(userId)
-      val usersUrl = (userInfo \ "urls" \ "users").as[String].replace("{version}", API_VERSION)
-      val url = usersUrl + s"/$userId/groups"
+    val userId = (userInfo \ "user_id").as[String]
+    val url = usersUrl(userInfo) + s"/$userId/groups"
 
-      WS.url(url)
-        .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
-        .withQueryString("pageSize" -> 250.toString)
-        .get()
-        .flatMap { response =>
-        response.status match {
-          case Status.OK =>
-            Future.successful((response.json \ "groups").as[JsArray])
-          case _ =>
-            Future.failed(ForceError(response.json))
-        }
+    WS.url(url)
+      .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+      .withQueryString("pageSize" -> 250.toString)
+      .get()
+      .flatMap { response =>
+      response.status match {
+        case Status.OK =>
+          Future.successful((response.json \ "groups").as[JsArray])
+        case _ =>
+          Future.failed(ForceError(response.json))
       }
     }
   }
@@ -351,9 +343,45 @@ object Force {
     query(auth, userInfo, soql).map(_.as[JsObject])
   }
 
+  def communities(auth: String, userInfo: JsValue): Future[JsArray] = {
+    // /services/data/v35.0/connect/communities
+
+    WS.url(restUrl(userInfo) + "connect/communities")
+      .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+      .get()
+      .flatMap { response =>
+        response.status match {
+          case Status.OK =>
+            Future.successful((response.json \ "communities").asOpt[JsArray].getOrElse(JsArray()))
+          case _ =>
+            Future.failed(ForceError(response.json))
+        }
+      }
+  }
+
+  def communityGroups(auth: String, userInfo: JsValue, communityId: String): Future[JsArray] = {
+    // /services/data/v35.0/connect/communities/communityId/chatter/groups/
+
+    WS.url(restUrl(userInfo) + s"connect/communities/$communityId/chatter/groups")
+      .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+      .get()
+      .flatMap { response =>
+        response.status match {
+          case Status.OK =>
+            Future.successful((response.json \ "groups").asOpt[JsArray].getOrElse(JsArray()))
+          case _ =>
+            Future.failed(ForceError(response.json))
+        }
+      }
+  }
+
   def queryUrl(value: JsValue) = (value \ "urls" \ "query").as[String].replace("{version}", API_VERSION)
 
   def sobjectsUrl(value: JsValue) = (value \ "urls" \ "sobjects").as[String].replace("{version}", API_VERSION)
+
+  def restUrl(value: JsValue) = (value \ "urls" \ "rest").as[String].replace("{version}", API_VERSION)
+
+  def usersUrl(value: JsValue) = (value \ "urls" \ "users").as[String].replace("{version}", API_VERSION)
 
   def instanceUrl(value: JsValue) =  (value \ "profile").as[String].stripSuffix((value \ "user_id").as[String])
 

@@ -25,5 +25,14 @@ class ForceIFTTTSpec extends PlaySpecification with SingleInstance {
       ((json \ "data").as[Seq[JsObject]].head \ "amount").asOpt[String] should beSome ("$1")
     }
   }
+
+  "allGroups" should {
+    "get all the groups" in {
+      val json = await(ForceIFTTT.allGroups(authToken))
+      (json \ "data").as[Seq[JsObject]].length should beGreaterThan (1)
+      ((json \ "data").as[Seq[JsObject]].head \ "label").asOpt[String] should beSome ("Foo")
+      ((json \ "data").as[Seq[JsObject]].head \ "value").asOpt[String] should beSome ("0F9j000000074BACAY")
+    }
+  }
   
 }

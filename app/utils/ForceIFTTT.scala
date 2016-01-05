@@ -32,6 +32,35 @@ object ForceIFTTT {
     } yield iftttJson
   }
 
+  def allGroups(auth: String): Future[JsObject] = {
+
+    def sortByLabel(jsArray: JsArray): Seq[JsValue] = jsArray.value.sortBy(_.\("label").as[String])
+
+    def communitiesGroupsFuture(userInfo: JsValue, communities: JsArray): Future[Seq[JsValue]] = {
+      Future.sequence {
+        communities.value.map { community =>
+          val communityId = (community \ "id").as[String]
+          val communityName = (community \ "name").as[String]
+
+          Force.communityGroups(auth, userInfo, communityId).flatMap { groups =>
+            groups.transform(Adapters.salesforceGroupsToIFTTT).map(sortByLabel).fold(
+              errors => Future.failed(JsTransformError(errors)),
+              groupsIfttt => Future.successful(Json.obj("label" -> s"Community: $communityName", "values" -> groupsIfttt))
+            )
+          }
+        }
+      }
+    }
+
+    for {
+      userInfo <- Force.userinfo(auth)
+      orgGroups <- Force.chatterGroups(auth, userInfo)
+      orgGroupsIfttt <- orgGroups.transform(Adapters.salesforceGroupsToIFTTT).map(sortByLabel).toFuture
+      communities <- Force.communities(auth, userInfo)
+      communitiesGroupsIfttt <- communitiesGroupsFuture(userInfo, communities)
+    } yield Json.obj("data" -> (orgGroupsIfttt ++ communitiesGroupsIfttt))
+  }
+
   implicit class JsResultToFuture[A](val value: JsResult[A]) extends AnyVal {
     def toFuture = value.fold(errors => Future.failed(JsTransformError(errors)), Future.successful)
   }

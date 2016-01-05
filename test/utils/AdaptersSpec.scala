@@ -2,7 +2,7 @@ package utils
 
 import org.specs2.matcher.JsonMatchers
 import org.specs2.mutable._
-import play.api.libs.json.{JsObject, JsString, Json}
+import play.api.libs.json._
 
 import scala.util.parsing.json.{JSONArray, JSONObject}
 
@@ -69,6 +69,58 @@ class AdaptersSpec extends Specification with JsonMatchers {
     "transform booleans" in {
       Adapters.anyJsValueToSalesforce(JsString("true")).asOpt[Boolean] must beSome(true)
       Adapters.anyJsValueToSalesforce(JsString("false")).asOpt[Boolean] must beSome(false)
+    }
+  }
+
+  "salesforceGroupToIFTTT" should {
+    "transform a group" in {
+      val salesforceGroup = Json.parse(
+        """{
+          |  "name": "foo",
+          |  "id": "1234"
+          |}
+        """.stripMargin)
+
+      val iftttGroup = salesforceGroup.transform(Adapters.salesforceGroupToIFTTT)
+      iftttGroup must beAnInstanceOf[JsSuccess[JsObject]]
+      (iftttGroup.get \ "label").asOpt[String] must beSome ("foo")
+      (iftttGroup.get \ "value").asOpt[String] must beSome ("1234")
+    }
+    "transform a group in a community" in {
+      val salesforceGroup = Json.parse(
+        """{
+          |  "name": "foo",
+          |  "id": "1234",
+          |  "community": {
+          |    "id": "5678"
+          |  }
+          |}
+        """.stripMargin)
+
+      val iftttGroup = salesforceGroup.transform(Adapters.salesforceGroupToIFTTT)
+      iftttGroup must beAnInstanceOf[JsSuccess[JsObject]]
+      (iftttGroup.get \ "label").asOpt[String] must beSome ("foo")
+      (iftttGroup.get \ "value").asOpt[String] must beSome ("5678:1234")
+      (iftttGroup.get \ "name").asOpt[String] must beNone
+    }
+  }
+
+  "salesforceGroupsToIFTTT" should {
+    "transform a group" in {
+      val salesforceGroups = Json.parse(
+        """[
+          |  {
+          |    "name": "foo",
+          |    "id": "1234"
+          |  }
+          |]
+        """.stripMargin)
+
+      val iftttGroups = salesforceGroups.transform(Adapters.salesforceGroupsToIFTTT)
+      iftttGroups must beAnInstanceOf[JsSuccess[JsArray]]
+      iftttGroups.get.value.length must beEqualTo (1)
+      (iftttGroups.get(0) \ "label").asOpt[String] must beSome ("foo")
+      (iftttGroups.get(0) \ "value").asOpt[String] must beSome ("1234")
     }
   }
 

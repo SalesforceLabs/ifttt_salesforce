@@ -4,6 +4,7 @@ import java.text.NumberFormat
 
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
+import play.api.data.validation.ValidationError
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
@@ -124,5 +125,51 @@ object Adapters {
       }
     )
   )
+
+  val maybeCommunityGroup: Reads[JsValue] = {
+    (
+      (__ \ 'community \ 'id).json.pick[JsString] and
+      (__ \ 'id).json.pick[JsString]
+    ).tupled.map { case (communityId: JsString, groupId: JsString) =>
+      JsString(s"${communityId.value}:${groupId.value}")
+    }
+  }
+
+  val salesforceGroupToIFTTT: Reads[JsObject] = (
+    (__ \ 'label).json.copyFrom((__ \ 'name).json.pick) ~
+    (__ \ 'value).json.copyFrom(maybeCommunityGroup orElse (__ \ 'id).json.pick)
+  ).reduce
+
+  val salesforceGroupsToIFTTT: Reads[JsArray] = jsArray(salesforceGroupToIFTTT)
+
+  def salesforceGroupWithCommunity(communityName: String): Reads[JsArray] = jsArray(
+    (__ \ 'name).json.update {
+      Reads.of[JsString].map {
+        case JsString(groupName) => JsString(s"$communityName: $groupName")
+      }
+    }
+  )
+
+  // applies a Reads[A] to each element in a JsArray
+  // from: http://stackoverflow.com/a/31449852/77409
+  def jsArray[A <: JsValue](implicit r: Reads[A]): Reads[JsArray] = new Reads[JsArray] {
+
+    def reads(json: JsValue) = json.validate[JsArray].flatMap { case JsArray(seq) =>
+      type Errors = Seq[(JsPath, Seq[ValidationError])]
+      def locate(e: Errors, idx: Int) = e.map { case (p, valerr) => JsPath(idx) ++ p -> valerr }
+
+      seq.zipWithIndex.foldLeft(Right(Vector.empty): Either[Errors, Vector[JsValue]]) {
+        case (eith, (jsVal, idx)) => (eith, jsVal.validate[A](r)) match {
+          case (Right(vs), JsSuccess(v, _)) => Right(vs :+ v)
+          case (Right(_), JsError(e)) => Left(locate(e, idx))
+          case (Left(e), _: JsSuccess[_]) => Left(e)
+          case (Left(e1), JsError(e2)) => Left(e1 ++ locate(e2, idx))
+        }
+      }.fold(JsError.apply, { res =>
+        JsSuccess(JsArray(res.toSeq))
+      })
+    }
+
+  }
 
 }
