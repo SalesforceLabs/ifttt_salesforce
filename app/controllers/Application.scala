@@ -2,7 +2,7 @@ package controllers
 
 import play.api.libs.Crypto
 import play.api.mvc.{Action, Controller}
-import utils.{ForceUtils, Global}
+import utils.{Force, Global}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -24,13 +24,13 @@ object Application extends Controller {
   def errors = Action.async { request =>
     request.flash.get("enc_access_token").fold {
       val redirUrl = routes.OAuth2.authorized().absoluteURL(secure = request.secure)(request)
-      val qs = s"client_id=${ForceUtils.salesforceOauthKey}&state=local-errors&response_type=code&prompt=login&redirect_uri=$redirUrl"
+      val qs = s"client_id=${Force.salesforceOauthKey}&state=local-errors&response_type=code&prompt=login&redirect_uri=$redirUrl"
 
       Future.successful(Ok(views.html.authorizeErrors(qs)))
     } { encAccessToken =>
       val accessToken = Crypto.decryptAES(encAccessToken)
       val auth = s"Bearer $accessToken"
-      ForceUtils.userinfo(auth).flatMap { userInfo =>
+      Force.userinfo(auth).flatMap { userInfo =>
         val userId = (userInfo \ "user_id").as[String]
 
         Global.redis.lrange[String](userId, 0, -1).map { errors =>
@@ -43,7 +43,7 @@ object Application extends Controller {
 
           Ok(views.html.errors(friendlyErrors, encAccessToken))
         }
-      } recoverWith ForceUtils.standardErrorHandler(auth)
+      } recoverWith Force.standardErrorHandler(auth)
     }
   }
 
@@ -53,13 +53,13 @@ object Application extends Controller {
     } { encAccessToken =>
       val accessToken = Crypto.decryptAES(encAccessToken)
       val auth = s"Bearer $accessToken"
-      ForceUtils.userinfo(auth).flatMap { userInfo =>
+      Force.userinfo(auth).flatMap { userInfo =>
         val userId = (userInfo \ "user_id").as[String]
 
         Global.redis.del(userId).map { errors =>
           Redirect(routes.Application.errors()).flashing("enc_access_token" -> encAccessToken)
         }
-      } recoverWith ForceUtils.standardErrorHandler(auth)
+      } recoverWith Force.standardErrorHandler(auth)
     }
   }
 

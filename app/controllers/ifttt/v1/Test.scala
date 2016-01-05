@@ -4,7 +4,7 @@ import controllers.ifttt.v1.Application._
 import play.api.Play
 import play.api.libs.json.Json
 import play.api.mvc.Action
-import utils.ForceUtils
+import utils.Force
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -12,7 +12,7 @@ object Test {
 
   def setup = Action.async { request =>
 
-    ForceUtils.login(ForceUtils.ENV_PROD, Play.current.configuration.getString("ifttt.test.username").get, Play.current.configuration.getString("ifttt.test.password").get).map { loginInfo =>
+    Force.login(Force.ENV_PROD, Play.current.configuration.getString("ifttt.test.username").get, Play.current.configuration.getString("ifttt.test.password").get).map { loginInfo =>
 
       val accessToken = (loginInfo \ "access_token").as[String]
 

@@ -15,7 +15,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
-object ForceUtils {
+object Force {
 
   val API_VERSION = "34.0"
 
@@ -270,7 +270,7 @@ object ForceUtils {
       Future.successful(Results.Unauthorized(""))
     } { auth =>
 
-      ForceUtils.userinfo(auth).flatMap { userinfo =>
+      Force.userinfo(auth).flatMap { userinfo =>
         val url = sobjectsUrl(userinfo)
 
         val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).get()
@@ -383,7 +383,7 @@ object ForceUtils {
       Logger.info(fe.getStackTrace.mkString)
       Logger.info(fe.json.toString)
       Logger.info(fe.getMessage)
-      ForceUtils.saveError(auth, fe.getMessage) {
+      Force.saveError(auth, fe.getMessage) {
         // transform error to ifttt
         Results.BadRequest(
           Json.obj("errors" ->
@@ -399,7 +399,7 @@ object ForceUtils {
     case e: Exception =>
       Logger.error(e.getStackTrace.mkString)
       Logger.error(e.getMessage)
-      ForceUtils.saveError(auth, e.getMessage) {
+      Force.saveError(auth, e.getMessage) {
         Results.InternalServerError(Json.obj("error" -> e.getMessage))
       }
   }

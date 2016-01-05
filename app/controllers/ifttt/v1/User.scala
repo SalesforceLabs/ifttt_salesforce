@@ -4,7 +4,7 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
 import play.api.mvc.{Action, Controller}
-import utils.{ForceUtils, Global}
+import utils.{Force, Global}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -15,10 +15,10 @@ object User extends Controller {
     request.headers.get(AUTHORIZATION).fold {
       Future.successful(Unauthorized("Request did not contain an Authorization header"))
     } { auth =>
-      ForceUtils.userinfo(auth).map { userinfo =>
+      Force.userinfo(auth).map { userinfo =>
         val authToken = auth.stripPrefix("Bearer ")
 
-        val instanceUrl = ForceUtils.instanceUrl(userinfo)
+        val instanceUrl = Force.instanceUrl(userinfo)
 
         val userId = (userinfo \ "user_id").as[String]
 
@@ -42,7 +42,7 @@ object User extends Controller {
           case JsError(error) =>
             InternalServerError("JSON was malformed: " + error.toString)
         }
-      } recoverWith ForceUtils.standardErrorHandler(auth)
+      } recoverWith Force.standardErrorHandler(auth)
     }
   }
 

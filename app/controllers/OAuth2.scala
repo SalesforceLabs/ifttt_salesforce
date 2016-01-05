@@ -7,7 +7,7 @@ import play.api.libs.json.Reads._
 import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
-import utils.{ForceUtils, Global}
+import utils.{Force, Global}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -47,7 +47,7 @@ object OAuth2 extends Controller {
   The user gets a cookie indicating they are using prod.
    */
   def authorizeProd() = Action { request =>
-    Redirect("https://login.salesforce.com/services/oauth2/authorize", request.queryString).withSession(ForceUtils.SALESFORCE_ENV -> ForceUtils.ENV_PROD)
+    Redirect("https://login.salesforce.com/services/oauth2/authorize", request.queryString).withSession(Force.SALESFORCE_ENV -> Force.ENV_PROD)
   }
 
   /*
@@ -56,7 +56,7 @@ object OAuth2 extends Controller {
   The user gets a cookie indicating they are using sandbox.
    */
   def authorizeSandbox() = Action { request =>
-    Redirect("https://test.salesforce.com/services/oauth2/authorize", request.queryString).withSession(ForceUtils.SALESFORCE_ENV -> ForceUtils.ENV_SANDBOX)
+    Redirect("https://test.salesforce.com/services/oauth2/authorize", request.queryString).withSession(Force.SALESFORCE_ENV -> Force.ENV_SANDBOX)
   }
 
   // Step 3 - User logs in and authorizes the app on salesforce
@@ -67,7 +67,7 @@ object OAuth2 extends Controller {
   Salesforce redirects here and we need to associate their code with the salesforce env
    */
   def authorized() = Action.async { request =>
-    val maybeSalesforceEnv = request.session.get(ForceUtils.SALESFORCE_ENV)
+    val maybeSalesforceEnv = request.session.get(Force.SALESFORCE_ENV)
     val maybeCode = request.queryString.get("code").flatMap(_.headOption)
 
     val maybeRedir = for {
@@ -86,8 +86,8 @@ object OAuth2 extends Controller {
 
           val body = Map(
             "grant_type" -> Seq("authorization_code"),
-            "client_id" -> Seq(ForceUtils.salesforceOauthKey),
-            "client_secret" -> Seq(ForceUtils.salesforceOauthSecret),
+            "client_id" -> Seq(Force.salesforceOauthKey),
+            "client_secret" -> Seq(Force.salesforceOauthSecret),
             "code" -> Seq(code)
           )
 
@@ -136,9 +136,9 @@ object OAuth2 extends Controller {
 
   private def tokenRefresh(request: Request[Map[String, Seq[String]]], refreshToken: String): Future[JsValue] = {
     Global.redis.get[String](DigestUtils.sha1Hex(refreshToken)).flatMap { maybeEnv =>
-      val env = maybeEnv.getOrElse(ForceUtils.ENV_PROD)
+      val env = maybeEnv.getOrElse(Force.ENV_PROD)
 
-      val tokenFuture = WS.url(ForceUtils.loginUrl(env)).post(request.body)
+      val tokenFuture = WS.url(Force.loginUrl(env)).post(request.body)
 
       tokenFuture.flatMap { response =>
         response.status match {
@@ -164,11 +164,11 @@ object OAuth2 extends Controller {
 
   private def tokenCode(request: Request[Map[String, Seq[String]]], code: String): Future[JsValue] = {
     Global.redis.get[String](DigestUtils.sha1Hex(code)).flatMap { maybeEnv =>
-      val env = maybeEnv.getOrElse(ForceUtils.ENV_PROD)
+      val env = maybeEnv.getOrElse(Force.ENV_PROD)
 
       val bodyWithRedir = request.body.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure =  true)(request)))
 
-      val tokenFuture = WS.url(ForceUtils.loginUrl(env)).post(bodyWithRedir)
+      val tokenFuture = WS.url(Force.loginUrl(env)).post(bodyWithRedir)
 
       tokenFuture.flatMap { response =>
         val maybeRefreshAccessTokens = for {

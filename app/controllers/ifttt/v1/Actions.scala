@@ -3,7 +3,7 @@ package controllers.ifttt.v1
 import play.api.libs.json.Reads._
 import play.api.libs.json._
 import play.api.mvc.{Action, Controller}
-import utils.{Adapters, ForceUtils}
+import utils.{Adapters, Force}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -30,8 +30,8 @@ object Actions extends Controller {
       val maybeGroup = (request.body \ "actionFields" \ "group").asOpt[String].filterNot(_.isEmpty)
 
       maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
-        ForceUtils.chatterPostMessage(auth, message, maybeGroup).map((responseJson _).tupled).map(Ok(_))
-      } recoverWith ForceUtils.standardErrorHandler(auth)
+        Force.chatterPostMessage(auth, message, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+      } recoverWith Force.standardErrorHandler(auth)
     }
   }
 
@@ -58,12 +58,12 @@ object Actions extends Controller {
 
       val resultFuture = (maybeFileUrl, maybeFileName) match {
         case (Some(fileUrl), Some(fileName)) =>
-          ForceUtils.chatterPostFile(auth, fileUrl, fileName, maybeMessage, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+          Force.chatterPostFile(auth, fileUrl, fileName, maybeMessage, maybeGroup).map((responseJson _).tupled).map(Ok(_))
         case _ =>
           Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Both the File URL and File Name are required")))
       }
 
-      resultFuture.recoverWith(ForceUtils.standardErrorHandler(auth))
+      resultFuture.recoverWith(Force.standardErrorHandler(auth))
     }
   }
 
@@ -89,8 +89,8 @@ object Actions extends Controller {
       val maybeLinkUrl = (request.body \ "actionFields" \ "link").asOpt[String]
 
       maybeLinkUrl.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "The link is required")))) { linkUrl =>
-        ForceUtils.chatterPostLink(auth, linkUrl, maybeMessage, maybeGroup).map((responseJson _).tupled).map(Ok(_))
-      } recoverWith ForceUtils.standardErrorHandler(auth)
+        Force.chatterPostLink(auth, linkUrl, maybeMessage, maybeGroup).map((responseJson _).tupled).map(Ok(_))
+      } recoverWith Force.standardErrorHandler(auth)
     }
   }
 
@@ -110,7 +110,7 @@ object Actions extends Controller {
 
       maybeSobject.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "An SObject must be specified")))) { sobject =>
 
-        ForceUtils.insert(auth, sobject, jsonToInsert).map { createJson =>
+        Force.insert(auth, sobject, jsonToInsert).map { createJson =>
           val id = (createJson \ "id").as[String]
 
           val json = Json.obj(
@@ -122,16 +122,16 @@ object Actions extends Controller {
           )
 
           Ok(json)
-        } recoverWith ForceUtils.standardErrorHandler(auth)
+        } recoverWith Force.standardErrorHandler(auth)
       }
     }
   }
 
-  def insertARecordFieldsSObjectOptions() = ForceUtils.sobjectOptions("createable")
+  def insertARecordFieldsSObjectOptions() = Force.sobjectOptions("createable")
 
   def postOnChatterFieldsGroupOptions() = Action.async(parse.json) { request =>
     request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
-      ForceUtils.chatterGroups(auth).map { groups =>
+      Force.chatterGroups(auth).map { groups =>
 
         val options = groups.value.map { group =>
           Json.obj("label" -> (group \ "name").as[String], "value" -> (group \ "id").as[String])
@@ -142,7 +142,7 @@ object Actions extends Controller {
             "data" -> options
           )
         )
-      }  recoverWith ForceUtils.standardErrorHandler(auth)
+      }  recoverWith Force.standardErrorHandler(auth)
     }
   }
 

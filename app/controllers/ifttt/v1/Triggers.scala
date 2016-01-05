@@ -3,7 +3,7 @@ package controllers.ifttt.v1
 import play.api.libs.json.Reads._
 import play.api.libs.json._
 import play.api.mvc.{Action, Controller}
-import utils.{ForceIFTTT, ForceUtils}
+import utils.{ForceIFTTT, Force}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -15,7 +15,7 @@ object Triggers extends Controller {
     val limit = (request.body \ "limit").asOpt[Int].getOrElse(5000)
 
     request.headers.get(AUTHORIZATION).map { auth =>
-      ForceIFTTT.opportunitiesWon(auth, limit).map(Ok(_)).recoverWith(ForceUtils.standardErrorHandler(auth))
+      ForceIFTTT.opportunitiesWon(auth, limit).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
     } getOrElse Future.successful(Unauthorized)
   }
 
@@ -53,7 +53,7 @@ object Triggers extends Controller {
           |LIMIT $limit
         """.stripMargin
 
-        ForceIFTTT.iftttEventQuery(auth, query).map(Ok(_)).recoverWith(ForceUtils.standardErrorHandler(auth))
+        ForceIFTTT.iftttEventQuery(auth, query).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
       } getOrElse Future.successful(Unauthorized)
     }
   }
@@ -95,11 +95,11 @@ object Triggers extends Controller {
           |LIMIT $limit
         """.stripMargin
 
-        ForceIFTTT.query(auth, query).map(Ok(_)).recoverWith(ForceUtils.standardErrorHandler(auth))
+        ForceIFTTT.query(auth, query).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
       } getOrElse Future.successful(Unauthorized)
     }
   }
 
-  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = ForceUtils.sobjectOptions("queryable")
+  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = Force.sobjectOptions("queryable")
 
 }

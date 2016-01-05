@@ -10,13 +10,13 @@ class ForceIFTTTSpec extends PlaySpecification with SingleInstance {
 
   lazy val authToken = {
     await {
-      ForceUtils.login(ForceUtils.ENV_PROD, Play.current.configuration.getString("ifttt.test.username").get, Play.current.configuration.getString("ifttt.test.password").get).map { loginInfo =>
+      Force.login(Force.ENV_PROD, Play.current.configuration.getString("ifttt.test.username").get, Play.current.configuration.getString("ifttt.test.password").get).map { loginInfo =>
         (loginInfo \ "access_token").as[String]
       }
     }
   }
 
-  lazy val userInfo = await(ForceUtils.userinfo(authToken))
+  lazy val userInfo = await(Force.userinfo(authToken))
 
   "opportunitiesWon" should {
     "get 1 opportunity" in {

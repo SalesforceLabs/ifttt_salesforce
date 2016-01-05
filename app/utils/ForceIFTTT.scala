@@ -10,24 +10,24 @@ object ForceIFTTT {
 
   def opportunitiesWon(auth: String, limit: Int): Future[JsObject] = {
     for {
-      userInfo <- ForceUtils.userinfo(auth)
-      salesforceJson <- ForceUtils.opportunitiesWon(auth, userInfo, limit)
-      iftttJson <- salesforceJson.transform(Adapters.opportunityWonQueryResultToIFTTT(ForceUtils.instanceUrl(userInfo))).toFuture
+      userInfo <- Force.userinfo(auth)
+      salesforceJson <- Force.opportunitiesWon(auth, userInfo, limit)
+      iftttJson <- salesforceJson.transform(Adapters.opportunityWonQueryResultToIFTTT(Force.instanceUrl(userInfo))).toFuture
     } yield iftttJson
   }
 
   def query(auth: String, query: String): Future[JsObject] = {
     for {
-      userInfo <- ForceUtils.userinfo(auth)
-      salesforceJson <- ForceUtils.query(auth, userInfo, query)
-      iftttJson <- salesforceJson.transform(Adapters.anyQueryResultToIFTTT(ForceUtils.instanceUrl(userInfo))).toFuture
+      userInfo <- Force.userinfo(auth)
+      salesforceJson <- Force.query(auth, userInfo, query)
+      iftttJson <- salesforceJson.transform(Adapters.anyQueryResultToIFTTT(Force.instanceUrl(userInfo))).toFuture
     } yield iftttJson
   }
 
   def iftttEventQuery(auth: String, query: String): Future[JsObject] = {
     for {
-      userInfo <- ForceUtils.userinfo(auth)
-      salesforceJson <- ForceUtils.query(auth, userInfo, query)
+      userInfo <- Force.userinfo(auth)
+      salesforceJson <- Force.query(auth, userInfo, query)
       iftttJson <- salesforceJson.transform(Adapters.iftttEventQueryResultToIFTTT).toFuture
     } yield iftttJson
   }
