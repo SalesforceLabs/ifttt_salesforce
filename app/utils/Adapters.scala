@@ -33,6 +33,7 @@ object Adapters {
 
   // 2015-07-06T19:07:56.000+0000
   val jodaDateTimeReads = jodaDateReads("yyyy-MM-dd'T'HH:mm:ss.SSSZZ")
+  val jodaSimpleDateReads = jodaDateReads("yyyy-MM-dd")
 
   // todo: I'm sure there is a much better way to compose these JSON transformers
 
@@ -46,7 +47,7 @@ object Adapters {
           val newArr = arr.map {
             case j: JsObject =>
               val oppId = (j \ "Id").as[String]
-              val timestamp = (j \ "LastModifiedDate").as[DateTime](jodaDateTimeReads)
+              val timestamp = (j \ "CloseDate").as[DateTime](jodaSimpleDateReads)
               val name = (j \ "Name").as[String]
               val amount = nf.format((j \ "Amount").asOpt[Double].getOrElse(0))
               val ownerName = (j \ "Owner" \ "Name").as[String]

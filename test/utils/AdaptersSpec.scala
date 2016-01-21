@@ -20,7 +20,7 @@ class AdaptersSpec extends Specification with JsonMatchers {
           |      "Id":"006o0000002el8xAAA",
           |      "Name":"asdf",
           |      "Amount":null,
-          |      "LastModifiedDate":"2014-07-02T15:55:32.000+0000",
+          |      "CloseDate":"2014-07-02",
           |      "Owner": {
           |        "Name": "Jon Doe"
           |      }
@@ -40,12 +40,12 @@ class AdaptersSpec extends Specification with JsonMatchers {
                   "amount" -> "$0",
                   "name" -> "asdf",
                   "link_to_opportunity" -> "006o0000002el8xAAA",
-                  "timestamp" -> "2014-07-02T09:55:32.000-06:00",
+                  "timestamp" -> "2014-07-02T00:00:00.000-06:00",
                   "owner_name" -> "Jon Doe",
                   "meta" -> JSONObject(
                     Map(
                       "id" -> "006o0000002el8xAAA",
-                      "timestamp" -> 1404316532D
+                      "timestamp" -> 1404280800D
                     )
                   )
                 )

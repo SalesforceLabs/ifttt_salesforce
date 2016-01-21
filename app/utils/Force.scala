@@ -333,10 +333,10 @@ object Force {
 
   def opportunitiesWon(auth: String, userInfo: JsValue, limit: Int): Future[JsObject] = {
     val soql = s"""
-                   |SELECT Id, LastModifiedDate, Name, Amount, Owner.Name
+                   |SELECT Id, CloseDate, Name, Amount, Owner.Name
                    |FROM Opportunity
                    |WHERE IsWon = TRUE
-                   |ORDER BY LastModifiedDate DESC
+                   |ORDER BY CloseDate DESC
                    |LIMIT $limit
                 """.stripMargin
 

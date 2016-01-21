@@ -28,21 +28,20 @@ class ForceSpec extends PlaySpecification with SingleInstance {
     }
   }
 
-  /*
   "chatterPostMessage" should {
     "post to a user feed" in {
-      val json = await(Force.chatterPostMessage(authToken, "test", None))
+      val json = await(Force.chatterPostMessage(authToken, "test", None, None))
       (json._1 \ "id").asOpt[String] should beSome
     }
     "post to a user feed" in {
-      val json = await(Force.chatterPostMessage(authToken, "test", Some("0F9j000000074BA")))
+      val json = await(Force.chatterPostMessage(authToken, "test", None, Some("0F9j000000074BA")))
       (json._1 \ "id").asOpt[String] should beSome
     }
   }
 
   "chatterPostFile" should {
     "post a file to a user feed" in {
-      val json = await(Force.chatterPostFile(authToken, "http://www.jamesward.com/images/james_ward_2015.jpg", "foooo.png", None, None))
+      val json = await(Force.chatterPostFile(authToken, "http://www.jamesward.com/images/james_ward_2015.jpg", "foooo.png", None, None, None))
       (json._1 \ "id").asOpt[String] should beSome
       (json._1 \ "capabilities" \ "content" \ "checksum").asOpt[String] should beSome("6a1fa22d29a720ac58930c3ababdf05b")
     }
@@ -50,7 +49,7 @@ class ForceSpec extends PlaySpecification with SingleInstance {
 
   "chatterPostLink" should {
     "post a link to a user feed" in {
-      val json = await(Force.chatterPostLink(authToken, "http://www.jamesward.com", None, None))
+      val json = await(Force.chatterPostLink(authToken, "http://www.jamesward.com", None, None, None))
       (json._1 \ "id").asOpt[String] should beSome
     }
   }
@@ -127,7 +126,6 @@ class ForceSpec extends PlaySpecification with SingleInstance {
       ((result \ "records").as[Seq[JsObject]].head \ "Owner" \ "Name").asOpt[String] should beSome ("IFTTT Test")
     }
   }
-  */
 
   "communities" should {
     "get a list of communities" in {
