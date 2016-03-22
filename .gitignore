@@ -12,5 +12,6 @@ dist
 /.classpath
 /.project
 /RUNNING_PID
+/dump.rdb
 /.settings
 .DS_Store

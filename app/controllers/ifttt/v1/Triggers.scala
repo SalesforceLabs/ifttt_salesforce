@@ -46,7 +46,7 @@ object Triggers extends Controller {
         }
 
         val query = s"""
-          |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c
+          |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c, ifttt__Related_Object_Id__c, ifttt__Related_Object_Type__c
           |FROM ifttt__IFTTT_Event__c
           |$whereStatement
           |ORDER BY LastModifiedDate DESC

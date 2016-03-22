@@ -82,11 +82,15 @@ object Adapters {
               val subject = (j \ "Name").as[String]
               val eventType = (j \ "ifttt__Type__c").asOpt[String].getOrElse("")
               val message = (j \ "ifttt__Message__c").asOpt[String].getOrElse("")
+              val relatedObjectId = (j \ "ifttt__Related_Object_Id__c").asOpt[String].getOrElse("")
+              val relatedObjectType = (j \ "ifttt__Related_Object_Type__c").asOpt[String].getOrElse("")
 
               Json.obj(
                 "type" -> eventType,
                 "subject" -> subject,
                 "message" -> message,
+                "related_object_id" -> relatedObjectId,
+                "related_object_type" -> relatedObjectType,
                 "timestamp" -> ISODateTimeFormat.dateTime().print(timestamp),
                 "meta" -> Json.obj(
                   "id" -> id,
