@@ -375,6 +375,23 @@ object Force {
       }
   }
 
+  def describe(auth: String, sobject: String): Future[JsValue] = {
+    userinfo(auth).flatMap { userInfo =>
+      WS.
+        url(sobjectsUrl(userInfo) + sobject + "/describe").
+        withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).
+        get().
+        flatMap { response =>
+          response.status match {
+            case Status.OK =>
+              Future.successful(response.json)
+            case _ =>
+              Future.failed(ForceError(response.json))
+          }
+        }
+    }
+  }
+
   def queryUrl(value: JsValue) = (value \ "urls" \ "query").as[String].replace("{version}", API_VERSION)
 
   def sobjectsUrl(value: JsValue) = (value \ "urls" \ "sobjects").as[String].replace("{version}", API_VERSION)

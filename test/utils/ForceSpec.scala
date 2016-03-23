@@ -140,5 +140,12 @@ class ForceSpec extends PlaySpecification with SingleInstance {
       result.value.length should beGreaterThan (0)
     }
   }
+
+  "describe" should {
+    "describe an SObject" in {
+      val result = await(Force.describe(authToken, "Contact"))
+      (result \ "label").as[String] must beEqualTo ("Contact")
+    }
+  }
   
 }

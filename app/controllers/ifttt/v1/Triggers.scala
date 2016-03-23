@@ -2,13 +2,26 @@ package controllers.ifttt.v1
 
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import play.api.mvc.{Action, Controller}
-import utils.{ForceIFTTT, Force}
+import play.api.mvc.{Action, Controller, Result}
+import utils.Force.UnauthorizedException
+import utils.{Force, ForceIFTTT}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object Triggers extends Controller {
+
+  private def unauthorized(error: String): Result = {
+    Unauthorized(
+      Json.obj(
+        "errors" -> Json.arr(
+          Json.obj(
+            "message" -> error
+          )
+        )
+      )
+    )
+  }
 
   def opportunityWasWon = Action.async(parse.json) { request =>
 
@@ -16,7 +29,7 @@ object Triggers extends Controller {
 
     request.headers.get(AUTHORIZATION).map { auth =>
       ForceIFTTT.opportunitiesWon(auth, limit).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
-    } getOrElse Future.successful(Unauthorized)
+    } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
   }
 
   def customSalesforceTrigger() = Action.async(parse.json) { request =>
@@ -35,26 +48,32 @@ object Triggers extends Controller {
       )
       Future.successful(BadRequest(json))
     } { eventType =>
-
       request.headers.get(AUTHORIZATION).map { auth =>
+        Force.describe(auth, "ifttt__IFTTT_Event__c").flatMap { describeJson =>
 
-        val whereStatement = if (eventType != "") {
-          s"WHERE ifttt__Type__c = '$eventType'"
+          val fields = (describeJson \ "fields").as[Seq[JsObject]].map(_.\("name").as[String])
+
+          val whereStatement = if (eventType != "") {
+            s"WHERE ifttt__Type__c = '$eventType'"
+          }
+          else {
+            ""
+          }
+
+          val query = s"""
+            |SELECT ${fields.mkString(", ")}
+            |FROM ifttt__IFTTT_Event__c
+            |$whereStatement
+
+            |ORDER BY LastModifiedDate DESC
+            |LIMIT $limit
+          """.stripMargin
+
+          ForceIFTTT.iftttEventQuery(auth, query).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
+        } recover {
+          case ua: UnauthorizedException => unauthorized(ua.message)
         }
-        else {
-          ""
-        }
-
-        val query = s"""
-          |SELECT Id, LastModifiedDate, Name, ifttt__Type__c, ifttt__Message__c, ifttt__Related_Object_Id__c, ifttt__Related_Object_Type__c
-          |FROM ifttt__IFTTT_Event__c
-          |$whereStatement
-          |ORDER BY LastModifiedDate DESC
-          |LIMIT $limit
-        """.stripMargin
-
-        ForceIFTTT.iftttEventQuery(auth, query).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
-      } getOrElse Future.successful(Unauthorized)
+      } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
     }
   }
 
@@ -96,7 +115,7 @@ object Triggers extends Controller {
         """.stripMargin
 
         ForceIFTTT.query(auth, query).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
-      } getOrElse Future.successful(Unauthorized)
+      } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
     }
   }
 
