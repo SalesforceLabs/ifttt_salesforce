@@ -405,7 +405,7 @@ object Force {
         )
       }
     case e: Exception =>
-      Logger.error(e.getStackTrace.mkString)
+      Logger.error(e.getStackTrace.mkString("\n"))
       Logger.error(e.getMessage)
       Force.saveError(auth, e.getMessage) {
         Results.InternalServerError(Json.obj("error" -> e.getMessage))
