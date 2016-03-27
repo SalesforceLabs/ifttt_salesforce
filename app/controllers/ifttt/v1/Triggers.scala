@@ -3,7 +3,7 @@ package controllers.ifttt.v1
 import play.api.libs.json.Reads._
 import play.api.libs.json._
 import play.api.mvc.{Action, Controller, Result}
-import utils.Force.UnauthorizedException
+import utils.Force.{ForceError, UnauthorizedException}
 import utils.{Force, ForceIFTTT}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -98,23 +98,35 @@ object Triggers extends Controller {
     } { case (sobject, queryCriteria) =>
 
       request.headers.get(AUTHORIZATION).map { auth =>
+        Force.describe(auth, sobject).flatMap { describeJson =>
 
-        val whereStatement = if (queryCriteria != "") {
-          s"WHERE $queryCriteria"
-        }
-        else {
-          ""
-        }
+          val fields = (describeJson \ "fields").as[Seq[JsObject]].map(_.\("name").as[String])
 
-        val query = s"""
-          |SELECT Id, LastModifiedDate
-          |FROM $sobject
-          |$whereStatement
-          |ORDER BY LastModifiedDate DESC
-          |LIMIT $limit
-        """.stripMargin
+          val maybeTimeStampField = fields.find { s =>
+            s == "LastModifiedDate" || s == "SystemModstamp"
+          }
 
-        ForceIFTTT.query(auth, query).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
+          maybeTimeStampField.fold {
+            Future.failed[Result](ForceError(s"Could not find a record time stamp field on $sobject"))
+          } { timeStampField =>
+            val whereStatement = if (queryCriteria != "") {
+              s"WHERE $queryCriteria"
+            }
+            else {
+              ""
+            }
+
+            val query = s"""
+                           |SELECT Id, $timeStampField
+                           |FROM $sobject
+                           |$whereStatement
+                           |ORDER BY $timeStampField DESC
+                           |LIMIT $limit
+          """.stripMargin
+
+            ForceIFTTT.query(auth, query).map(Ok(_))
+          }
+        } recoverWith Force.standardErrorHandler(auth)
       } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
     }
   }

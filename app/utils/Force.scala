@@ -42,7 +42,7 @@ object Force {
             Future.failed(UnauthorizedException(userInfoResponse.body))
           case _ =>
             val jsonTry = Try(userInfoResponse.json)
-            Future.failed(jsonTry.map(ForceError).getOrElse(new Exception("Could not get user info: " + userInfoResponse.body)))
+            Future.failed(jsonTry.map(ForceError.apply).getOrElse(new Exception("Could not get user info: " + userInfoResponse.body)))
         }
       }
     }
@@ -420,6 +420,16 @@ object Force {
     override def getMessage = {
       (json \\ "message").map(_.as[String]).mkString
     }
+  }
+
+  object ForceError {
+    def apply(message: String): ForceError = new ForceError(
+      Json.arr(
+        Json.obj(
+          "message" -> message
+        )
+      )
+    )
   }
 
 }
