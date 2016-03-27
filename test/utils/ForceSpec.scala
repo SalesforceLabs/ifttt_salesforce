@@ -3,7 +3,7 @@ package utils
 import play.api.Play
 import play.api.libs.json.{JsObject, Json}
 import play.api.test.{FakeApplication, PlaySpecification}
-import utils.Force.ForceError
+import utils.Force.{ForceError, UnauthorizedException}
 
 import scala.util.Try
 
@@ -20,6 +20,12 @@ class ForceSpec extends PlaySpecification with SingleInstance {
   }
 
   lazy val userInfo = await(Force.userinfo(authToken))
+
+  "login" should {
+    "fail with invalid credentials" in {
+      await(Force.login(Force.ENV_PROD, "foo", "bar")) should throwA[UnauthorizedException]("authentication failure")
+    }
+  }
 
   "chatterGroups" should {
     "fetch the list of chatter groups" in {
@@ -96,6 +102,9 @@ class ForceSpec extends PlaySpecification with SingleInstance {
   }
 
   "query" should {
+    "not work with an invalid auth token" in {
+      await(Force.query("asdf", userInfo, "SELECT Id FROM Contact")) should throwA[UnauthorizedException]("Session expired or invalid")
+    }
     "work with a valid query" in {
       val result = await(Force.query(authToken, userInfo, "SELECT Id FROM Contact"))
       (result \ "totalSize").as[Int] should beGreaterThan (0)
@@ -147,5 +156,5 @@ class ForceSpec extends PlaySpecification with SingleInstance {
       (result \ "label").as[String] must beEqualTo ("Contact")
     }
   }
-  
+
 }

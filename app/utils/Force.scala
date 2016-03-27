@@ -58,6 +58,21 @@ object Force {
     case ENV_SANDBOX => "https://test.salesforce.com/services/oauth2/userinfo"
   }
 
+  private def on[T](status: Int)(body: WSResponse => T)(response: WSResponse): Future[T] = {
+    response.status match {
+      case `status` =>
+        Future.successful(body(response))
+      case Status.BAD_REQUEST if (response.json \ "error").asOpt[String].contains("invalid_grant") =>
+        val errorMessage = (response.json \ "error_description").as[String]
+        Future.failed(UnauthorizedException(errorMessage))
+      case Status.UNAUTHORIZED =>
+        val errorMessage = (response.json \\ "message").map(_.as[String]).mkString
+        Future.failed(UnauthorizedException(errorMessage))
+      case _ =>
+        Future.failed(ForceError(response.json))
+    }
+  }
+
   def login(env: String, username: String, password: String): Future[JsValue] = {
 
     val body = Map(
@@ -68,13 +83,9 @@ object Force {
       "password" -> password
     ).mapValues(Seq(_))
 
-    WS.url(loginUrl(env)).post(body).flatMap { response =>
-      response.status match {
-        case Status.OK => Future.successful(response.json)
-        case _ => Future.failed(ForceError(response.json))
-      }
+    WS.url(loginUrl(env)).post(body).flatMap {
+      on(Status.OK)(_.json)
     }
-
   }
 
   private def feedUrl(userInfo: JsValue, maybeCommunityId: Option[String]): String = {
@@ -103,12 +114,9 @@ object Force {
       WS.url(feedUrl(userInfo, maybeCommunityId))
         .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
         .post(json)
-        .flatMap { createResponse =>
-          createResponse.status match {
-            case Status.CREATED =>
-              Future.successful(createResponse.json, instanceUrl(userInfo))
-            case _ =>
-              Future.failed(ForceError(createResponse.json))
+        .flatMap {
+          on(Status.CREATED) { response =>
+            (response.json, instanceUrl(userInfo))
           }
         }
     }
@@ -147,14 +155,9 @@ object Force {
       WS.url(feedUrl(userInfo, maybeCommunityId))
         .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
         .post(jsonWithMaybeMessage)
-        .flatMap { createResponse =>
-        createResponse.status match {
-          case Status.CREATED =>
-            Future.successful(createResponse.json, instanceUrl(userInfo))
-          case _ =>
-            Future.failed(ForceError(createResponse.json))
+        .flatMap {
+          on(Status.CREATED) { createResponse => (createResponse.json, instanceUrl(userInfo)) }
         }
-      }
     }
 
   }
@@ -248,13 +251,8 @@ object Force {
         url(sobjectsUrl(userInfo) + sobject).
         withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).
         post(json).
-        flatMap { response =>
-          response.status match {
-            case Status.CREATED =>
-              Future.successful(response.json)
-            case _ =>
-              Future.failed(ForceError(response.json))
-          }
+        flatMap {
+          on(Status.CREATED)(_.json)
         }
     }
   }
@@ -271,26 +269,20 @@ object Force {
 
         val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).get()
 
-        queryRequest.flatMap { queryResponse =>
+        queryRequest.flatMap {
+          on(Status.OK) { queryResponse =>
+            val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
 
-          queryResponse.status match {
-            case Status.OK =>
-              val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
+            // todo: use a JSON transformer
+            val options = sobjects.filter(_.\(filter).as[Boolean]).map { json =>
+              Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
+            } sortBy (_.\("label").as[String])
 
-              // todo: use a JSON transformer
-              val options = sobjects.filter(_.\(filter).as[Boolean]).map { json =>
-                Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
-              } sortBy (_.\("label").as[String])
-
-              Future.successful(
-                Results.Ok(
-                  Json.obj(
-                    "data" -> options
-                  )
-                )
+            Results.Ok(
+              Json.obj(
+                "data" -> options
               )
-            case _ =>
-              Future.failed(ForceError(queryResponse.json))
+            )
           }
         }
       } recoverWith standardErrorHandler(auth)
@@ -306,14 +298,9 @@ object Force {
       .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
       .withQueryString("pageSize" -> 250.toString)
       .get()
-      .flatMap { response =>
-      response.status match {
-        case Status.OK =>
-          Future.successful((response.json \ "groups").as[JsArray])
-        case _ =>
-          Future.failed(ForceError(response.json))
+      .flatMap {
+        on(Status.OK)(_.json.\("groups").as[JsArray])
       }
-    }
   }
 
   def query(auth: String, userInfo: JsValue, soql: String): Future[JsValue] = {
@@ -321,14 +308,7 @@ object Force {
       .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
       .withQueryString("q" -> soql)
       .get()
-      .flatMap { response =>
-        response.status match {
-          case Status.OK =>
-            Future.successful(response.json)
-          case _ =>
-            Future.failed(ForceError(response.json))
-        }
-      }
+      .flatMap(on(Status.OK)(_.json))
   }
 
   def opportunitiesWon(auth: String, userInfo: JsValue, limit: Int): Future[JsObject] = {
@@ -349,13 +329,8 @@ object Force {
     WS.url(restUrl(userInfo) + "connect/communities")
       .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
       .get()
-      .flatMap { response =>
-        response.status match {
-          case Status.OK =>
-            Future.successful((response.json \ "communities").asOpt[JsArray].getOrElse(JsArray()))
-          case _ =>
-            Future.failed(ForceError(response.json))
-        }
+      .flatMap {
+        on(Status.OK)(_.json.\("communities").asOpt[JsArray].getOrElse(JsArray()))
       }
   }
 
@@ -365,13 +340,8 @@ object Force {
     WS.url(restUrl(userInfo) + s"connect/communities/$communityId/chatter/groups")
       .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
       .get()
-      .flatMap { response =>
-        response.status match {
-          case Status.OK =>
-            Future.successful((response.json \ "groups").asOpt[JsArray].getOrElse(JsArray()))
-          case _ =>
-            Future.failed(ForceError(response.json))
-        }
+      .flatMap {
+        on(Status.OK)(_.json.\("groups").asOpt[JsArray].getOrElse(JsArray()))
       }
   }
 
@@ -381,14 +351,7 @@ object Force {
         url(sobjectsUrl(userInfo) + sobject + "/describe").
         withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).
         get().
-        flatMap { response =>
-          response.status match {
-            case Status.OK =>
-              Future.successful(response.json)
-            case _ =>
-              Future.failed(ForceError(response.json))
-          }
-        }
+        flatMap(on(Status.OK)(_.json))
     }
   }
 
