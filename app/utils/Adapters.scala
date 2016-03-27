@@ -114,15 +114,18 @@ object Adapters {
           val newArr = arr.map {
             case j: JsObject =>
               val id = (j \ "Id").as[String]
-              val timestamp = (j \ "LastModifiedDate").as[DateTime](jodaDateTimeReads)
+              val maybeLastModified = (j \ "LastModifiedDate").asOpt[DateTime](jodaDateTimeReads)
+              val maybeSystemModstamp = (j \ "SystemModstamp").asOpt[DateTime](jodaDateTimeReads)
               val linkToRecord = instanceUrl + id
+
+              val bestEffortDate = maybeLastModified.orElse(maybeSystemModstamp).getOrElse(DateTime.now())
 
               Json.obj(
                 "link_to_record" -> linkToRecord,
-                "timestamp" -> ISODateTimeFormat.dateTime().print(timestamp),
+                "timestamp" -> ISODateTimeFormat.dateTime().print(bestEffortDate),
                 "meta" -> Json.obj(
                   "id" -> id,
-                  "timestamp" -> timestamp.getMillis / 1000
+                  "timestamp" -> bestEffortDate.getMillis / 1000
                 )
               )
             case _ =>
