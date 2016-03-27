@@ -69,10 +69,8 @@ object Triggers extends Controller {
             |LIMIT $limit
           """.stripMargin
 
-          ForceIFTTT.iftttEventQuery(auth, query).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
-        } recover {
-          case ua: UnauthorizedException => unauthorized(ua.message)
-        }
+          ForceIFTTT.iftttEventQuery(auth, query).map(Ok(_))
+        } recoverWith Force.standardErrorHandler(auth)
       } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
     }
   }

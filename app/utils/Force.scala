@@ -388,8 +388,8 @@ object Force {
       )
       Future.successful(Results.Unauthorized(json))
     case fe: ForceError =>
-      Logger.info(fe.getStackTrace.mkString)
-      Logger.info(fe.json.toString)
+      Logger.info(fe.getStackTrace.mkString("\n"))
+      Logger.info(Json.asciiStringify(fe.json))
       Logger.info(fe.getMessage)
       Force.saveError(auth, fe.getMessage) {
         // transform error to ifttt
