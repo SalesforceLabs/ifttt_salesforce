@@ -7,10 +7,14 @@ import play.api.Play.current
 import utils.Force.ForceError
 import utils.{Force, ForceIFTTT}
 
+import com.github.t3hnar.bcrypt._
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object Triggers extends Controller {
+
+  lazy val salt = generateSalt
 
   private def unauthorized(error: String): Result = {
     Unauthorized(
@@ -101,46 +105,45 @@ object Triggers extends Controller {
         import com.github.t3hnar.bcrypt._
         import play.api.cache.Cache
 
-        val authHash = auth.bcrypt
+        val authHash = auth.bcrypt(salt)
 
-        val describeCacheKey = s"$authHash-$sobject-describe"
+        val timeStampFieldCacheKey = s"$authHash-$sobject-timestampfield"
 
-        val maybeCache = Cache.getAs[JsValue](describeCacheKey)
+        val maybeTimeStampFieldCache = Cache.getAs[String](timeStampFieldCacheKey)
 
-        val describeFuture = maybeCache.map(Future.successful).getOrElse {
-          val f = Force.describe(auth, sobject)
-          f.foreach { describeJson => Cache.set(describeCacheKey, describeJson) }
-          f
+        val timeStampFieldFuture = maybeTimeStampFieldCache.map(Future.successful).getOrElse {
+          Force.describe(auth, sobject).flatMap { describeJson =>
+            val fields = (describeJson \ "fields").as[Seq[JsObject]].map(_.\("name").as[String])
+            val maybeTimeStampField = fields.find { s =>
+              s == "LastModifiedDate" || s == "SystemModstamp"
+            }
+
+            maybeTimeStampField.fold {
+              Future.failed[String](ForceError(s"Could not find a record time stamp field on $sobject"))
+            } { timeStampField =>
+              Cache.set(timeStampFieldCacheKey, timeStampField)
+              Future.successful(timeStampField)
+            }
+          }
         }
 
-        describeFuture.flatMap { describeJson =>
-
-          val fields = (describeJson \ "fields").as[Seq[JsObject]].map(_.\("name").as[String])
-
-          val maybeTimeStampField = fields.find { s =>
-            s == "LastModifiedDate" || s == "SystemModstamp"
+        timeStampFieldFuture.flatMap { timeStampField =>
+          val whereStatement = if (queryCriteria != "") {
+            s"WHERE $queryCriteria"
+          }
+          else {
+            ""
           }
 
-          maybeTimeStampField.fold {
-            Future.failed[Result](ForceError(s"Could not find a record time stamp field on $sobject"))
-          } { timeStampField =>
-            val whereStatement = if (queryCriteria != "") {
-              s"WHERE $queryCriteria"
-            }
-            else {
-              ""
-            }
+          val query = s"""
+                         |SELECT Id, $timeStampField
+                         |FROM $sobject
+                         |$whereStatement
+                         |ORDER BY $timeStampField DESC
+                         |LIMIT $limit
+            """.stripMargin
 
-            val query = s"""
-                           |SELECT Id, $timeStampField
-                           |FROM $sobject
-                           |$whereStatement
-                           |ORDER BY $timeStampField DESC
-                           |LIMIT $limit
-          """.stripMargin
-
-            ForceIFTTT.query(auth, query).map(Ok(_))
-          }
+          ForceIFTTT.query(auth, query).map(Ok(_))
         } recoverWith Force.standardErrorHandler(auth)
       } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
     }
