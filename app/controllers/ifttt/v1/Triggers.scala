@@ -3,7 +3,8 @@ package controllers.ifttt.v1
 import play.api.libs.json.Reads._
 import play.api.libs.json._
 import play.api.mvc.{Action, Controller, Result}
-import utils.Force.{ForceError, UnauthorizedException}
+import play.api.Play.current
+import utils.Force.ForceError
 import utils.{Force, ForceIFTTT}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -96,7 +97,23 @@ object Triggers extends Controller {
     } { case (sobject, queryCriteria) =>
 
       request.headers.get(AUTHORIZATION).map { auth =>
-        Force.describe(auth, sobject).flatMap { describeJson =>
+
+        import com.github.t3hnar.bcrypt._
+        import play.api.cache.Cache
+
+        val authHash = auth.bcrypt
+
+        val describeCacheKey = s"$authHash-$sobject-describe"
+
+        val maybeCache = Cache.getAs[JsValue](describeCacheKey)
+
+        val describeFuture = maybeCache.map(Future.successful).getOrElse {
+          val f = Force.describe(auth, sobject)
+          f.foreach { describeJson => Cache.set(describeCacheKey, describeJson) }
+          f
+        }
+
+        describeFuture.flatMap { describeJson =>
 
           val fields = (describeJson \ "fields").as[Seq[JsObject]].map(_.\("name").as[String])
 

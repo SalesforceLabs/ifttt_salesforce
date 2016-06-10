@@ -10,7 +10,9 @@ resolvers += "rediscala" at "http://dl.bintray.com/etaty/maven"
 
 libraryDependencies ++= Seq(
   ws,
+  cache,
   "com.etaty.rediscala" %% "rediscala" % "1.4.0",
+  "com.github.t3hnar" %% "scala-bcrypt" % "2.6",
   "org.webjars" %% "webjars-play" % "2.3.0-3",
   "org.webjars" % "salesforce-lightning-design-system" % "0.9.2"
 )
