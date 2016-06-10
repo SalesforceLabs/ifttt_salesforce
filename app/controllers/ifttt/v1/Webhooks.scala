@@ -67,17 +67,20 @@ object Webhooks extends Controller {
     val orgId = (request.body \ "orgId").as[String]
 
     Global.redis.smembers[String](orgId).flatMap { watchers =>
-        val json = Json.obj(
-          "data" -> watchers.map { userId =>
-            Json.obj("user_id" -> userId)
-          }
-        )
 
-        WS.
-          url("https://realtime.ifttt.com/v1/notifications").
-          withHeaders("IFTTT-Channel-Key" -> Global.ifffChannelKey).
-          post(json).
-          map(r => Ok)
+      import java.util.UUID
+
+      val json = Json.obj(
+        "data" -> watchers.map { userId =>
+          Json.obj("user_id" -> userId)
+        }
+      )
+
+      WS.
+        url("https://realtime.ifttt.com/v1/notifications").
+        withHeaders("IFTTT-Channel-Key" -> Global.ifffChannelKey, "X-Request-ID" -> UUID.randomUUID().toString).
+        post(json).
+        map(_ => Ok)
     }
   }
 
