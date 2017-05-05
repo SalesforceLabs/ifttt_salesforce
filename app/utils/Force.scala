@@ -257,6 +257,18 @@ object Force {
     }
   }
 
+  def update(auth: String, sobject: String, id: String, json: JsObject): Future[Unit] = {
+    userinfo(auth).flatMap { userInfo =>
+      WS.
+        url(sobjectsUrl(userInfo) + sobject + "/" + id).
+        withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).
+        patch(json).
+        flatMap {
+          on(Status.NO_CONTENT)(_ => Unit)
+        }
+    }
+  }
+
   // todo: move action code out of here
   def sobjectOptions(filter: String): Action[JsValue] = Action.async(BodyParsers.parse.json) { request =>
 

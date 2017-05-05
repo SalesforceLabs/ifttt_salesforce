@@ -119,13 +119,15 @@ object Adapters {
               val linkToRecord = instanceUrl + id
 
               val bestEffortDate = maybeLastModified.orElse(maybeSystemModstamp).getOrElse(DateTime.now())
+              val bestEffortSeconds = bestEffortDate.getMillis / 1000
 
               Json.obj(
+                "id" -> id,
                 "link_to_record" -> linkToRecord,
                 "timestamp" -> ISODateTimeFormat.dateTime().print(bestEffortDate),
                 "meta" -> Json.obj(
-                  "id" -> id,
-                  "timestamp" -> bestEffortDate.getMillis / 1000
+                  "id" -> (id + "-" + bestEffortSeconds),
+                  "timestamp" -> bestEffortSeconds
                 )
               )
             case _ =>

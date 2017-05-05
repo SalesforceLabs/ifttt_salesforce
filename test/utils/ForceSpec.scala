@@ -101,6 +101,17 @@ class ForceSpec extends PlaySpecification with SingleInstance {
     }
   }
 
+  "update" should {
+    "work" in {
+      val contact = Json.obj("LastName" -> "Foo")
+      val insert = await(Force.insert(authToken, "Contact", contact))
+      val id = (insert \ "id").as[String]
+
+      val contactUpdate = Json.obj("LastName" -> "Bar")
+      await(Force.update(authToken, "Contact", id, contactUpdate)) should beEqualTo (())
+    }
+  }
+
   "query" should {
     "not work with an invalid auth token" in {
       await(Force.query("asdf", userInfo, "SELECT Id FROM Contact")) should throwA[UnauthorizedException]("Session expired or invalid")
