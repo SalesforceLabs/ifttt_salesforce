@@ -47,7 +47,8 @@ object Adapters {
           val newArr = arr.map {
             case j: JsObject =>
               val oppId = (j \ "Id").as[String]
-              val timestamp = (j \ "CloseDate").as[DateTime](jodaSimpleDateReads)
+              val timestamp = (j \ "LastModifiedDate").as[DateTime](jodaDateTimeReads)
+              val closeDate = (j \ "CloseDate").as[DateTime](jodaSimpleDateReads)
               val name = (j \ "Name").as[String]
               val amount = nf.format((j \ "Amount").asOpt[Double].getOrElse(0))
               val ownerName = (j \ "Owner" \ "Name").as[String]
@@ -58,6 +59,7 @@ object Adapters {
                 "link_to_opportunity" -> (instanceUrl + oppId),
                 "timestamp" -> ISODateTimeFormat.dateTime().print(timestamp),
                 "owner_name" -> ownerName,
+                "close_date" -> ISODateTimeFormat.dateTime().print(closeDate),
                 "meta" -> Json.obj(
                   "id" -> oppId,
                   "timestamp" -> timestamp.getMillis / 1000
