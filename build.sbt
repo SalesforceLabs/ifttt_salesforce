@@ -5,6 +5,7 @@ name := "ifttt-salesforce"
 scalaVersion := "2.12.7"
 
 libraryDependencies ++= Seq(
+  guice,
   ws,
   ehcache,
   "com.typesafe.play" %% "play-json-joda" % "2.7.0-RC2",
