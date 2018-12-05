@@ -2,15 +2,16 @@ package controllers.ifttt.v1
 
 import java.net.URL
 
-import play.api.Play.current
+import javax.inject.Inject
+import modules.Redis
 import play.api.libs.json.Json
-import play.api.libs.ws.WS
-import play.api.mvc.{Action, Controller}
-import utils.Global
+import play.api.libs.ws.WSClient
+import play.api.mvc.InjectedController
+import utils.ForceIFTTT
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
-object Webhooks extends Controller {
+class Webhooks @Inject() (redis: Redis, ws: WSClient, forceIFTTT: ForceIFTTT) (implicit ec: ExecutionContext) extends InjectedController {
 
   /*
     An outbound message inserts a new record into the IFTTT Event SObject
@@ -23,14 +24,15 @@ object Webhooks extends Controller {
 
     val actionId = (request.body \ "Body" \ "notifications" \ "ActionId").text
 
-    val objectType = (request.body \ "Body" \ "notifications" \ "Notification" \ "sObject" \@ "{http://www.w3.org/2001/XMLSchema-instance}type").stripPrefix("sf:")
+    // todo: why isn't this used?
+    //val objectType = (request.body \ "Body" \ "notifications" \ "Notification" \ "sObject" \@ "{http://www.w3.org/2001/XMLSchema-instance}type").stripPrefix("sf:")
 
     val objectId = (request.body \ "Body" \ "notifications" \ "Notification" \ "sObject" \ "Id").text
 
     val restBaseUrl = s"https://${partnerUrl.getHost}/services/data/v31.0"
 
     // get the workflow info
-    WS.url(s"$restBaseUrl/tooling/sobjects/WorkflowOutboundMessage/$actionId").withHeaders(AUTHORIZATION -> s"Bearer $sessionId").get().flatMap { actionResponse =>
+    ws.url(s"$restBaseUrl/tooling/sobjects/WorkflowOutboundMessage/$actionId").withHttpHeaders(AUTHORIZATION -> s"Bearer $sessionId").get().flatMap { actionResponse =>
 
       val actionName = (actionResponse.json \ "Name").as[String]
 
@@ -41,7 +43,7 @@ object Webhooks extends Controller {
         "ifttt__Message__c" -> s"Details: https://${partnerUrl.getHost}/$objectId"
       )
 
-      WS.url(s"$restBaseUrl/sobjects/ifttt__IFTTT_Event__c").withHeaders(AUTHORIZATION -> s"Bearer $sessionId").post(eventJson).map { createEventResponse =>
+      ws.url(s"$restBaseUrl/sobjects/ifttt__IFTTT_Event__c").withHttpHeaders(AUTHORIZATION -> s"Bearer $sessionId").post(eventJson).map { createEventResponse =>
 
         val success = (createEventResponse.json \ "success").as[Boolean]
 
@@ -66,7 +68,7 @@ object Webhooks extends Controller {
 
     val orgId = (request.body \ "orgId").as[String]
 
-    Global.redis.smembers[String](orgId).flatMap { watchers =>
+    redis.client.smembers[String](orgId).flatMap { watchers =>
 
       import java.util.UUID
 
@@ -76,9 +78,9 @@ object Webhooks extends Controller {
         }
       )
 
-      WS.
+      ws.
         url("https://realtime.ifttt.com/v1/notifications").
-        withHeaders("IFTTT-Channel-Key" -> Global.ifffChannelKey, "X-Request-ID" -> UUID.randomUUID().toString).
+        withHttpHeaders("IFTTT-Channel-Key" -> forceIFTTT.ifffChannelKey, "X-Request-ID" -> UUID.randomUUID().toString).
         post(json).
         map(_ => Ok)
     }

@@ -1,31 +1,32 @@
 package controllers.ifttt.v1
 
+import javax.inject.Inject
+import modules.Redis
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import play.api.mvc.{Action, Controller}
-import utils.{Force, Global}
+import play.api.mvc.InjectedController
+import utils.Force
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-object User extends Controller {
+class User @Inject() (force: Force, redis: Redis) (implicit ec: ExecutionContext) extends InjectedController {
 
   def info = Action.async { implicit request =>
     request.headers.get(AUTHORIZATION).fold {
       Future.successful(Unauthorized("Request did not contain an Authorization header"))
     } { auth =>
-      Force.userinfo(auth).map { userinfo =>
+      force.userinfo(auth).map { userinfo =>
         val authToken = auth.stripPrefix("Bearer ")
 
-        val instanceUrl = Force.instanceUrl(userinfo)
+        val instanceUrl = force.instanceUrl(userinfo)
 
         val userId = (userinfo \ "user_id").as[String]
 
         val orgId = (userinfo \ "organization_id").as[String]
 
         // add the user to the watchers in this org in order to support real-time notifications
-        Global.redis.sadd(orgId, userId)
+        redis.client.sadd(orgId, userId)
 
         val jsonResult = userinfo.transform {
           val reads = {
@@ -42,7 +43,7 @@ object User extends Controller {
           case JsError(error) =>
             InternalServerError("JSON was malformed: " + error.toString)
         }
-      } recoverWith Force.standardErrorHandler(auth)
+      } recoverWith force.standardErrorHandler(auth)
     }
   }
 

@@ -1,24 +1,24 @@
 package controllers.ifttt.v1
 
-import controllers.ifttt.v1.Application._
-import play.api.Play
+import javax.inject.Inject
+import play.api.Configuration
 import play.api.libs.json.Json
-import play.api.mvc.Action
+import play.api.mvc.InjectedController
 import utils.Force
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
-object Test {
+class Test @Inject() (force: Force, configuration: Configuration) (implicit ec: ExecutionContext) extends InjectedController {
 
   def setup = Action.async { request =>
 
-    Force.login(Force.ENV_PROD, Play.current.configuration.getString("ifttt.test.username").get, Play.current.configuration.getString("ifttt.test.password").get).map { loginInfo =>
+    force.login(Force.ENV_PROD, configuration.get[String]("ifttt.test.username"), configuration.get[String]("ifttt.test.password")).map { loginInfo =>
 
       val accessToken = (loginInfo \ "access_token").as[String]
 
       val maybeOk = for {
         received <- request.headers.get("IFTTT-Channel-Key")
-        expected <- Play.current.configuration.getString("ifttt.channel.key")
+        expected <- configuration.getOptional[String]("ifttt.channel.key")
         if received == expected
       } yield {
           val json = Json.obj(

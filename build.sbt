@@ -2,17 +2,17 @@ lazy val root = (project in file(".")).enablePlugins(PlayScala, ForcePlugin)
 
 name := "ifttt-salesforce"
 
-version := "1.0-SNAPSHOT"
-
-scalaVersion := "2.11.11"
+scalaVersion := "2.12.7"
 
 libraryDependencies ++= Seq(
   ws,
-  cache,
-  "com.github.etaty" %% "rediscala" % "1.7.0",
-  "com.github.t3hnar" %% "scala-bcrypt" % "2.6",
-  "org.webjars" %% "webjars-play" % "2.3.0-3",
-  "org.webjars" % "salesforce-lightning-design-system" % "0.9.2"
+  ehcache,
+  "com.typesafe.play" %% "play-json-joda" % "2.7.0-RC2",
+  "com.github.etaty" %% "rediscala" % "1.8.0",
+  "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
+  "org.webjars" %% "webjars-play" % "2.7.0-RC3",
+  "org.webjars" % "salesforce-lightning-design-system" % "0.9.2",
+  specs2 % Test
 )
 
 username in Force := sys.env.getOrElse("SALESFORCE_USERNAME", "")

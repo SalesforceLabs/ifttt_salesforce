@@ -1,12 +1,10 @@
 package utils
 
-import org.specs2.matcher.JsonMatchers
 import org.specs2.mutable._
 import play.api.libs.json._
 
-import scala.util.parsing.json.{JSONArray, JSONObject}
 
-class AdaptersSpec extends Specification with JsonMatchers {
+class AdaptersSpec extends Specification {
 
   "opportunityWonQueryResultToIFTTT" should {
     "transform salesforce records into ifttt trigger data" in {
@@ -20,6 +18,7 @@ class AdaptersSpec extends Specification with JsonMatchers {
           |      "Id":"006o0000002el8xAAA",
           |      "Name":"asdf",
           |      "Amount":null,
+          |      "LastModifiedDate":"2015-07-06T19:07:56.000+0000",
           |      "CloseDate":"2014-07-02",
           |      "Owner": {
           |        "Name": "Jon Doe"
@@ -32,29 +31,28 @@ class AdaptersSpec extends Specification with JsonMatchers {
 
       actualIFTTTResponse must beRight { json: JsObject =>
 
-        json.toString must /(
-          "data" -> JSONArray(
-            List(
-              JSONObject(
-                Map(
-                  "amount" -> "$0",
-                  "name" -> "asdf",
-                  "link_to_opportunity" -> "006o0000002el8xAAA",
-                  "timestamp" -> "2014-07-02T00:00:00.000-06:00",
-                  "owner_name" -> "Jon Doe",
-                  "meta" -> JSONObject(
-                    Map(
-                      "id" -> "006o0000002el8xAAA",
-                      "timestamp" -> 1404280800D
-                    )
-                  )
-                )
-              )
-            )
+        json must beEqualTo(
+          Json.parse(
+            """|{
+               |  "data": [
+               |    {
+               |      "name": "asdf",
+               |      "amount": "$0",
+               |      "link_to_opportunity": "006o0000002el8xAAA",
+               |      "timestamp": "2015-07-06T13:07:56.000-06:00",
+               |      "owner_name": "Jon Doe",
+               |      "close_date": "2014-07-02T00:00:00.000-06:00",
+               |      "meta": {
+               |        "id": "006o0000002el8xAAA",
+               |        "timestamp": 1436209676
+               |      }
+               |    }
+               |  ]
+               |}
+            """.stripMargin
           )
         )
       }
-
     }
   }
 

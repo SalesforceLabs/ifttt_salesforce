@@ -4,7 +4,6 @@ import java.text.NumberFormat
 
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
-import play.api.data.validation.ValidationError
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
@@ -14,7 +13,7 @@ object Adapters {
   def anyJsValueToSalesforce(jsValue: JsValue): JsValue = {
 
     // July 10, 2015 at 8:00AM
-    val googleDateTimeReads: Reads[JsValue] = jodaDateReads("MMMM dd, YYYY 'at' hh:mma").map { dateTime =>
+    val googleDateTimeReads: Reads[JsValue] = JodaReads.jodaDateReads("MMMM dd, YYYY 'at' hh:mma").map { dateTime =>
       JsNumber(dateTime.getMillis)
     }
 
@@ -32,8 +31,8 @@ object Adapters {
   }
 
   // 2015-07-06T19:07:56.000+0000
-  val jodaDateTimeReads = jodaDateReads("yyyy-MM-dd'T'HH:mm:ss.SSSZZ")
-  val jodaSimpleDateReads = jodaDateReads("yyyy-MM-dd")
+  val jodaDateTimeReads = JodaReads.jodaDateReads("yyyy-MM-dd'T'HH:mm:ss.SSSZZ")
+  val jodaSimpleDateReads = JodaReads.jodaDateReads("yyyy-MM-dd")
 
   // todo: I'm sure there is a much better way to compose these JSON transformers
 
@@ -166,24 +165,21 @@ object Adapters {
 
   // applies a Reads[A] to each element in a JsArray
   // from: http://stackoverflow.com/a/31449852/77409
-  def jsArray[A <: JsValue](implicit r: Reads[A]): Reads[JsArray] = new Reads[JsArray] {
+  def jsArray[A <: JsValue](implicit r: Reads[A]): Reads[JsArray] = (json: JsValue) => json.validate[JsArray].flatMap { case JsArray(seq) =>
+    type Errors = Seq[(JsPath, Seq[JsonValidationError])]
 
-    def reads(json: JsValue) = json.validate[JsArray].flatMap { case JsArray(seq) =>
-      type Errors = Seq[(JsPath, Seq[ValidationError])]
-      def locate(e: Errors, idx: Int) = e.map { case (p, valerr) => JsPath(idx) ++ p -> valerr }
+    def locate(e: Errors, idx: Int) = e.map { case (p, valerr) => JsPath(idx) ++ p -> valerr }
 
-      seq.zipWithIndex.foldLeft(Right(Vector.empty): Either[Errors, Vector[JsValue]]) {
-        case (eith, (jsVal, idx)) => (eith, jsVal.validate[A](r)) match {
-          case (Right(vs), JsSuccess(v, _)) => Right(vs :+ v)
-          case (Right(_), JsError(e)) => Left(locate(e, idx))
-          case (Left(e), _: JsSuccess[_]) => Left(e)
-          case (Left(e1), JsError(e2)) => Left(e1 ++ locate(e2, idx))
-        }
-      }.fold(JsError.apply, { res =>
-        JsSuccess(JsArray(res.toSeq))
-      })
-    }
-
+    seq.zipWithIndex.foldLeft(Right(Vector.empty): Either[Errors, Vector[JsValue]]) {
+      case (eith, (jsVal, idx)) => (eith, jsVal.validate[A](r)) match {
+        case (Right(vs), JsSuccess(v, _)) => Right(vs :+ v)
+        case (Right(_), JsError(e)) => Left(locate(e, idx))
+        case (Left(e), _: JsSuccess[_]) => Left(e)
+        case (Left(e1), JsError(e2)) => Left(e1 ++ locate(e2, idx))
+      }
+    }.fold(JsError.apply, { res =>
+      JsSuccess(JsArray(res))
+    })
   }
 
 }

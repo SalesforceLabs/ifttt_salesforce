@@ -1,18 +1,21 @@
 package controllers
 
-import org.apache.commons.codec.digest.DigestUtils
-import play.api.Play.current
-import play.api.libs.Crypto
+import javax.inject.{Inject, Singleton}
+import modules.Redis
+import play.api.libs.Codecs
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import play.api.libs.ws.WS
+import play.api.libs.ws.WSClient
 import play.api.mvc._
-import utils.{Force, Global}
+import utils.{Crypto, Force, ForceIFTTT}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-object OAuth2 extends Controller {
+@Singleton
+class OAuth2 @Inject()
+  (redis: Redis, force: Force, forceIFTTT: ForceIFTTT, ws: WSClient)
+  (authorizeView: views.html.authorize)
+  (implicit ec: ExecutionContext) extends InjectedController {
 
   /*
   Step 1
@@ -34,7 +37,7 @@ object OAuth2 extends Controller {
       val qs = toQs(qsMapWithRedir)
       val errorQs = toQs(qsMapWithRedir.updated("state", Seq("local-errors")))
 
-      Ok(views.html.authorize(qs, errorQs))
+      Ok(authorizeView(qs, errorQs))
     }
     else {
       Redirect(routes.Application.index())
@@ -77,8 +80,8 @@ object OAuth2 extends Controller {
         request.queryString.get("state").flatMap(_.headOption).filter(_.startsWith("local-")).fold {
           // login to ifttt
 
-          Global.redis.set(DigestUtils.sha1Hex(code), salesforceEnv)
-          Future.successful(Redirect(s"https://ifttt.com/channels/${Global.ifffChannelId}/authorize", request.queryString))
+          redis.client.set(Codecs.sha1(code), salesforceEnv)
+          Future.successful(Redirect(s"https://ifttt.com/channels/${forceIFTTT.ifffChannelId}/authorize", request.queryString))
         } { state =>
           // login to this app
 
@@ -86,8 +89,8 @@ object OAuth2 extends Controller {
 
           val body = Map(
             "grant_type" -> Seq("authorization_code"),
-            "client_id" -> Seq(Force.salesforceOauthKey),
-            "client_secret" -> Seq(Force.salesforceOauthSecret),
+            "client_id" -> Seq(force.salesforceOauthKey),
+            "client_secret" -> Seq(force.salesforceOauthSecret),
             "code" -> Seq(code)
           )
 
@@ -95,7 +98,7 @@ object OAuth2 extends Controller {
           tokenCode(r, code).map { json =>
             (json \ "access_token").asOpt[String].fold(Unauthorized("Could not login")) { accessToken =>
               val encAccessToken = Crypto.encryptAES(accessToken)
-              Redirect(s"/$url").flashing("enc_access_token" -> encAccessToken)
+              Redirect(s"/$url").flash("enc_access_token" -> encAccessToken)
             }
           } recover {
             case e: Exception => InternalServerError(e.getMessage)
@@ -111,7 +114,7 @@ object OAuth2 extends Controller {
 
   IFTTT calls here with the code or a refresh_token
    */
-  def token = Action.async(parse.urlFormEncoded) { request =>
+  def token = Action.async(parse.formUrlEncoded) { request =>
     val maybeRefreshToken = request.body.get("refresh_token").flatMap(_.headOption)
     val maybeCode = request.body.get("code").flatMap(_.headOption)
 
@@ -135,10 +138,10 @@ object OAuth2 extends Controller {
   }
 
   private def tokenRefresh(request: Request[Map[String, Seq[String]]], refreshToken: String): Future[JsValue] = {
-    Global.redis.get[String](DigestUtils.sha1Hex(refreshToken)).flatMap { maybeEnv =>
+    redis.client.get[String](Codecs.sha1(refreshToken)).flatMap { maybeEnv =>
       val env = maybeEnv.getOrElse(Force.ENV_PROD)
 
-      val tokenFuture = WS.url(Force.loginUrl(env)).post(request.body)
+      val tokenFuture = ws.url(force.loginUrl(env)).post(request.body)
 
       tokenFuture.flatMap { response =>
         response.status match {
@@ -146,7 +149,7 @@ object OAuth2 extends Controller {
             (response.json \ "access_token").asOpt[String].fold {
               Future.failed[JsValue](LoginException("Could not retrieve the access token: " + response.body))
             } { accessToken =>
-              Global.redis.set(DigestUtils.sha1Hex(s"Bearer $accessToken"), env).map { _ =>
+              redis.client.set(Codecs.sha1(s"Bearer $accessToken"), env).map { _ =>
                 // adding the refresh token back into the json because ifttt needs it
                 response.json.as[JsObject] + ("refresh_token" -> JsString(refreshToken))
               }
@@ -163,12 +166,12 @@ object OAuth2 extends Controller {
   }
 
   private def tokenCode(request: Request[Map[String, Seq[String]]], code: String): Future[JsValue] = {
-    Global.redis.get[String](DigestUtils.sha1Hex(code)).flatMap { maybeEnv =>
+    redis.client.get[String](Codecs.sha1(code)).flatMap { maybeEnv =>
       val env = maybeEnv.getOrElse(Force.ENV_PROD)
 
       val bodyWithRedir = request.body.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure =  true)(request)))
 
-      val tokenFuture = WS.url(Force.loginUrl(env)).post(bodyWithRedir)
+      val tokenFuture = ws.url(force.loginUrl(env)).post(bodyWithRedir)
 
       tokenFuture.flatMap { response =>
         val maybeRefreshAccessTokens = for {
@@ -181,9 +184,9 @@ object OAuth2 extends Controller {
           Future.failed[JsValue](LoginException(s"Could not retrieve refresh and access tokens: $error"))
         } { case (refreshToken, accessToken) =>
           // store the hash of the refresh token with the env in redis
-          Global.redis.set(DigestUtils.sha1Hex(refreshToken), env).flatMap { _ =>
+          redis.client.set(Codecs.sha1(refreshToken), env).flatMap { _ =>
             // store the hash of the access token with the env in redis
-            Global.redis.set(DigestUtils.sha1Hex(s"Bearer $accessToken"), env).map(_ => response.json)
+            redis.client.set(Codecs.sha1(s"Bearer $accessToken"), env).map(_ => response.json)
           }
         }
       }

@@ -1,44 +1,40 @@
 package utils
 
-import com.ning.http.client._
-import com.ning.http.multipart.{FilePart, Part, StringPart, _}
-import org.apache.commons.codec.digest.DigestUtils
-import play.api.Play.current
-import play.api.http.{ContentTypes, HeaderNames, Status}
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
+import javax.inject.{Inject, Singleton}
+import modules.Redis
+import play.api.libs.Codecs
 import play.api.libs.json._
-import play.api.libs.ws.ning.NingWSResponse
-import play.api.libs.ws.{WS, WSResponse}
-import play.api.mvc._
-import play.api.{Logger, Play}
+import play.api.libs.ws.{WSClient, WSResponse}
+import play.api.mvc.MultipartFormData.FilePart
+import play.api.mvc.{Action, InjectedController, Result}
+import play.api.{Configuration, Logging}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-object Force {
+@Singleton
+class Force @Inject() (configuration: Configuration, ws: WSClient, redis: Redis) (implicit ec: ExecutionContext) extends InjectedController with Logging {
 
-  val API_VERSION = "34.0"
+  import Force._
 
-  val ENV_PROD = "prod"
-  val ENV_SANDBOX = "sandbox"
-  val SALESFORCE_ENV = "salesforce-env"
+  lazy val salesforceOauthKey = configuration.get[String]("salesforce.oauth.key")
+  lazy val salesforceOauthSecret = configuration.get[String]("salesforce.oauth.secret")
 
-  lazy val salesforceOauthKey = Play.current.configuration.getString("salesforce.oauth.key").get
-  lazy val salesforceOauthSecret = Play.current.configuration.getString("salesforce.oauth.secret").get
-
-  lazy val managedPackageId = Play.current.configuration.getString("salesforce.managed-package-id").get
+  lazy val managedPackageId = configuration.get[String]("salesforce.managed-package-id")
 
   private def bearerAuth(auth: String) = if (auth.startsWith("Bearer ")) auth else s"Bearer $auth"
 
   // todo: maybe put an in-memory cache here since this can get called a lot
   def userinfo(auth: String): Future[JsValue] = {
-    Global.redis.get[String](DigestUtils.sha1Hex(bearerAuth(auth))).flatMap { maybeEnv =>
+    redis.client.get[String](Codecs.sha1(bearerAuth(auth))).flatMap { maybeEnv =>
       val env = maybeEnv.getOrElse(ENV_PROD)
-      WS.url(userinfoUrl(env)).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).get().flatMap { userInfoResponse =>
+      ws.url(userinfoUrl(env)).withHttpHeaders(AUTHORIZATION -> bearerAuth(auth)).get().flatMap { userInfoResponse =>
         userInfoResponse.status match {
-          case Status.OK =>
+          case OK =>
             Future.successful(userInfoResponse.json)
-          case Status.UNAUTHORIZED | Status.FORBIDDEN =>
+          case UNAUTHORIZED | FORBIDDEN =>
             Future.failed(UnauthorizedException(userInfoResponse.body))
           case _ =>
             val jsonTry = Try(userInfoResponse.json)
@@ -62,10 +58,10 @@ object Force {
     response.status match {
       case `status` =>
         Future.successful(body(response))
-      case Status.BAD_REQUEST if (response.json \ "error").asOpt[String].contains("invalid_grant") =>
+      case BAD_REQUEST if (response.json \ "error").asOpt[String].contains("invalid_grant") =>
         val errorMessage = (response.json \ "error_description").as[String]
         Future.failed(UnauthorizedException(errorMessage))
-      case Status.UNAUTHORIZED =>
+      case UNAUTHORIZED =>
         val errorMessage = (response.json \\ "message").map(_.as[String]).mkString
         Future.failed(UnauthorizedException(errorMessage))
       case _ =>
@@ -83,8 +79,8 @@ object Force {
       "password" -> password
     ).mapValues(Seq(_))
 
-    WS.url(loginUrl(env)).post(body).flatMap {
-      on(Status.OK)(_.json)
+    ws.url(loginUrl(env)).post(body).flatMap {
+      on(OK)(_.json)
     }
   }
 
@@ -111,11 +107,11 @@ object Force {
         "subjectId" -> subjectId
       )
 
-      WS.url(feedUrl(userInfo, maybeCommunityId))
-        .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+      ws.url(feedUrl(userInfo, maybeCommunityId))
+        .withHttpHeaders(AUTHORIZATION -> bearerAuth(auth))
         .post(json)
         .flatMap {
-          on(Status.CREATED) { response =>
+          on(CREATED) { response =>
             (response.json, instanceUrl(userInfo))
           }
         }
@@ -152,53 +148,20 @@ object Force {
         json ++ body
       }
 
-      WS.url(feedUrl(userInfo, maybeCommunityId))
-        .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+      ws.url(feedUrl(userInfo, maybeCommunityId))
+        .withHttpHeaders(AUTHORIZATION -> bearerAuth(auth))
         .post(jsonWithMaybeMessage)
         .flatMap {
-          on(Status.CREATED) { createResponse => (createResponse.json, instanceUrl(userInfo)) }
+          on(CREATED) { createResponse => (createResponse.json, instanceUrl(userInfo)) }
         }
     }
 
   }
 
-  private def postMultiPart(url: String, headers: Seq[(String, String)], bodyParts: Seq[Part]): Future[WSResponse] = {
-    val client = WS.client.underlying.asInstanceOf[AsyncHttpClient]
-
-    val builder = client.preparePost(url)
-
-    builder.setHeader(HeaderNames.CONTENT_TYPE, "multipart/form-data")
-    headers.foreach((builder.setHeader _).tupled)
-    bodyParts.foreach(builder.addBodyPart)
-
-    val request = builder.build()
-
-    val result = Promise[NingWSResponse]()
-
-      client.executeRequest(request, new AsyncCompletionHandler[Response]() {
-        override def onCompleted(response: Response) = {
-          result.trySuccess(NingWSResponse(response))
-          response
-        }
-
-        override def onThrowable(t: Throwable) = {
-          result.tryFailure(t)
-        }
-      })
-
-    result.future
-  }
-
-  class JsonPart(name: String, value: JsValue) extends StringPart(name, value.toString()) {
-    override def getContentType: String = ContentTypes.JSON
-  }
-
   // todo: max file size
   def chatterPostFile(auth: String, fileUrl: String, fileName: String, maybeMessage: Option[String], maybeCommunityId: Option[String], maybeGroup: Option[String]): Future[(JsValue, String)] = {
     userinfo(auth).flatMap { userInfo =>
-      WS.url(fileUrl).get().flatMap { response =>
-        val fileBytes = response.underlying[com.ning.http.client.Response].getResponseBodyAsBytes
-
+      ws.url(fileUrl).get().flatMap { response =>
         val userId = (userInfo \ "user_id").as[String]
         val subjectId = maybeGroup.getOrElse(userId)
 
@@ -227,62 +190,65 @@ object Force {
           json ++ body
         }
 
-        val jsonPart = new JsonPart("json", jsonWithMaybeMessage)
+        val filePart = FilePart("feedElementFileUpload", fileName, Some(response.contentType), response.bodyAsSource)
+        val jsonPart = FilePart("json", "", Some(JSON), Source.single(ByteString(jsonWithMaybeMessage.toString())))
 
-        val filePartSource = new ByteArrayPartSource(fileName, fileBytes)
+        val parts = Source(filePart :: jsonPart :: List())
 
-        val filePart = new FilePart("feedElementFileUpload", filePartSource)
-
-        postMultiPart(feedUrl(userInfo, maybeCommunityId), Seq(HeaderNames.AUTHORIZATION -> bearerAuth(auth)), Seq(jsonPart, filePart)).flatMap { createResponse =>
-          createResponse.status match {
-            case Status.CREATED =>
-              Future.successful(createResponse.json, instanceUrl(userInfo))
-            case _ =>
-              Future.failed(ForceError(createResponse.json))
+        ws.
+          url(feedUrl(userInfo, maybeCommunityId)).
+          withHttpHeaders(AUTHORIZATION -> bearerAuth(auth)).
+          post(parts).
+          flatMap { createResponse =>
+            createResponse.status match {
+              case CREATED =>
+                Future.successful(createResponse.json, instanceUrl(userInfo))
+              case _ =>
+                Future.failed(ForceError(createResponse.json))
+            }
           }
-        }
       }
     }
   }
 
   def insert(auth: String, sobject: String, json: JsValue): Future[JsValue] = {
     userinfo(auth).flatMap { userInfo =>
-      WS.
+      ws.
         url(sobjectsUrl(userInfo) + sobject).
-        withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).
+        withHttpHeaders(AUTHORIZATION -> bearerAuth(auth)).
         post(json).
         flatMap {
-          on(Status.CREATED)(_.json)
+          on(CREATED)(_.json)
         }
     }
   }
 
   def update(auth: String, sobject: String, id: String, json: JsObject): Future[Unit] = {
     userinfo(auth).flatMap { userInfo =>
-      WS.
+      ws.
         url(sobjectsUrl(userInfo) + sobject + "/" + id).
-        withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).
+        withHttpHeaders(AUTHORIZATION -> bearerAuth(auth)).
         patch(json).
         flatMap {
-          on(Status.NO_CONTENT)(_ => Unit)
+          on(NO_CONTENT)(_ => Unit)
         }
     }
   }
 
   // todo: move action code out of here
-  def sobjectOptions(filter: String): Action[JsValue] = Action.async(BodyParsers.parse.json) { request =>
+  def sobjectOptions(filter: String): Action[JsValue] = Action.async(parse.json) { request =>
 
-    request.headers.get(HeaderNames.AUTHORIZATION).fold {
-      Future.successful(Results.Unauthorized(""))
+    request.headers.get(AUTHORIZATION).fold {
+      Future.successful(Unauthorized(ByteString.empty))
     } { auth =>
 
-      Force.userinfo(auth).flatMap { userinfo =>
+      userinfo(auth).flatMap { userinfo =>
         val url = sobjectsUrl(userinfo)
 
-        val queryRequest = WS.url(url).withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).get()
+        val queryRequest = ws.url(url).withHttpHeaders(AUTHORIZATION -> bearerAuth(auth)).get()
 
         queryRequest.flatMap {
-          on(Status.OK) { queryResponse =>
+          on(OK) { queryResponse =>
             val sobjects = (queryResponse.json \ "sobjects").as[Seq[JsObject]]
 
             // todo: use a JSON transformer
@@ -290,7 +256,7 @@ object Force {
               Json.obj("label" -> (json \ "label").as[String], "value" -> (json \ "name").as[String])
             } sortBy (_.\("label").as[String])
 
-            Results.Ok(
+            Ok(
               Json.obj(
                 "data" -> options
               )
@@ -306,30 +272,31 @@ object Force {
     val userId = (userInfo \ "user_id").as[String]
     val url = usersUrl(userInfo) + s"/$userId/groups"
 
-    WS.url(url)
-      .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
-      .withQueryString("pageSize" -> 250.toString)
+    ws.url(url)
+      .withHttpHeaders(AUTHORIZATION -> bearerAuth(auth))
+      .withQueryStringParameters("pageSize" -> 250.toString)
       .get()
       .flatMap {
-        on(Status.OK)(_.json.\("groups").as[JsArray])
+        on(OK)(_.json.\("groups").as[JsArray])
       }
   }
 
   def query(auth: String, userInfo: JsValue, soql: String): Future[JsValue] = {
-    WS.url(queryUrl(userInfo))
-      .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
-      .withQueryString("q" -> soql)
+    ws.url(queryUrl(userInfo))
+      .withHttpHeaders(AUTHORIZATION -> bearerAuth(auth))
+      .withQueryStringParameters("q" -> soql)
       .get()
-      .flatMap(on(Status.OK)(_.json))
+      .flatMap(on(OK)(_.json))
   }
 
   def opportunitiesWon(auth: String, userInfo: JsValue, limit: Int): Future[JsObject] = {
-    val soql = s"""
-                   |SELECT Id, LastModifiedDate, CloseDate, Name, Amount, Owner.Name
-                   |FROM Opportunity
-                   |WHERE IsWon = TRUE
-                   |ORDER BY LastModifiedDate DESC
-                   |LIMIT $limit
+    val soql =
+      s"""
+         |SELECT Id, LastModifiedDate, CloseDate, Name, Amount, Owner.Name
+         |FROM Opportunity
+         |WHERE IsWon = TRUE
+         |ORDER BY LastModifiedDate DESC
+         |LIMIT $limit
                 """.stripMargin
 
     query(auth, userInfo, soql).map(_.as[JsObject])
@@ -338,32 +305,32 @@ object Force {
   def communities(auth: String, userInfo: JsValue): Future[JsArray] = {
     // /services/data/v35.0/connect/communities
 
-    WS.url(restUrl(userInfo) + "connect/communities")
-      .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+    ws.url(restUrl(userInfo) + "connect/communities")
+      .withHttpHeaders(AUTHORIZATION -> bearerAuth(auth))
       .get()
       .flatMap {
-        on(Status.OK)(_.json.\("communities").asOpt[JsArray].getOrElse(JsArray()))
+        on(OK)(_.json.\("communities").asOpt[JsArray].getOrElse(JsArray()))
       }
   }
 
   def communityGroups(auth: String, userInfo: JsValue, communityId: String): Future[JsArray] = {
     // /services/data/v35.0/connect/communities/communityId/chatter/groups/
 
-    WS.url(restUrl(userInfo) + s"connect/communities/$communityId/chatter/groups")
-      .withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth))
+    ws.url(restUrl(userInfo) + s"connect/communities/$communityId/chatter/groups")
+      .withHttpHeaders(AUTHORIZATION -> bearerAuth(auth))
       .get()
       .flatMap {
-        on(Status.OK)(_.json.\("groups").asOpt[JsArray].getOrElse(JsArray()))
+        on(OK)(_.json.\("groups").asOpt[JsArray].getOrElse(JsArray()))
       }
   }
 
   def describe(auth: String, sobject: String): Future[JsValue] = {
     userinfo(auth).flatMap { userInfo =>
-      WS.
+      ws.
         url(sobjectsUrl(userInfo) + sobject + "/describe").
-        withHeaders(HeaderNames.AUTHORIZATION -> bearerAuth(auth)).
+        withHttpHeaders(AUTHORIZATION -> bearerAuth(auth)).
         get().
-        flatMap(on(Status.OK)(_.json))
+        flatMap(on(OK)(_.json))
     }
   }
 
@@ -375,15 +342,15 @@ object Force {
 
   def usersUrl(value: JsValue) = (value \ "urls" \ "users").as[String].replace("{version}", API_VERSION)
 
-  def instanceUrl(value: JsValue) =  (value \ "profile").as[String].stripSuffix((value \ "user_id").as[String])
+  def instanceUrl(value: JsValue) = (value \ "profile").as[String].stripSuffix((value \ "user_id").as[String])
 
   def saveError(auth: String, error: String)(result: => Result): Future[Result] = {
     userinfo(auth).flatMap { userInfo =>
       val userId = (userInfo \ "user_id").as[String]
-      Global.redis.lpush(userId, error).map(_ => result)
+      redis.client.lpush(userId, error).map(_ => result)
     } recover {
       case e: Exception =>
-        Logger.error(e.getMessage)
+        logger.error(e.getMessage)
         result
     }
   }
@@ -398,31 +365,42 @@ object Force {
           )
         )
       )
-      Future.successful(Results.Unauthorized(json))
+      Future.successful(Unauthorized(json))
     case fe: ForceError =>
-      Logger.info(fe.getStackTrace.mkString("\n"))
-      Logger.info(Json.asciiStringify(fe.json))
-      Logger.info(fe.getMessage)
-      Force.saveError(auth, fe.getMessage) {
+      logger.info(fe.getStackTrace.mkString("\n"))
+      logger.info(Json.asciiStringify(fe.json))
+      logger.info(fe.getMessage)
+      saveError(auth, fe.getMessage) {
         // transform error to ifttt
-        Results.BadRequest(
+        BadRequest(
           Json.obj("errors" ->
             fe.json.as[Seq[JsObject]].map { error =>
               Json.obj(
-                "status" -> (error \ "errorCode"),
-                "message" -> (error \ "message")
+                "status" -> (error \ "errorCode").as[JsValue],
+                "message" -> (error \ "message").as[JsValue]
               )
             }
           )
         )
       }
     case e: Exception =>
-      Logger.error(e.getStackTrace.mkString("\n"))
-      Logger.error(e.getMessage)
-      Force.saveError(auth, e.getMessage) {
-        Results.InternalServerError(Json.obj("error" -> e.getMessage))
+      logger.error(e.getStackTrace.mkString("\n"))
+      logger.error(e.getMessage)
+      saveError(auth, e.getMessage) {
+        InternalServerError(Json.obj("error" -> e.getMessage))
       }
   }
+}
+
+object Force {
+
+  // todo: as of version 36.0 the multipart upload to the chatter feed is no longer supported:
+  // https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/intro_input.htm
+  val API_VERSION = "34.0"
+
+  val ENV_PROD = "prod"
+  val ENV_SANDBOX = "sandbox"
+  val SALESFORCE_ENV = "salesforce-env"
 
   case class UnauthorizedException(message: String) extends Exception {
     override def getMessage = message

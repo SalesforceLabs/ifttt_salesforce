@@ -1,14 +1,15 @@
 package controllers.ifttt.v1
 
+import javax.inject.{Inject, Singleton}
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import play.api.mvc.{Action, Controller}
-import utils.{ForceIFTTT, Adapters, Force}
+import play.api.mvc.InjectedController
+import utils.{Adapters, Force, ForceIFTTT}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-object Actions extends Controller {
+@Singleton
+class Actions @Inject() (force: Force, forceIFTTT: ForceIFTTT) (implicit ec: ExecutionContext) extends InjectedController {
 
   private def maybeCommunityGroup(maybeValue: Option[String]): (Option[String], Option[String]) = {
     maybeValue.fold(Option.empty[String], Option.empty[String]) { value =>
@@ -40,8 +41,8 @@ object Actions extends Controller {
       val (maybeCommunityId, maybeGroupId) = maybeCommunityGroup((request.body \ "actionFields" \ "group").asOpt[String])
 
       maybeMessage.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Message field was missing")))) { message =>
-        Force.chatterPostMessage(auth, message, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
-      } recoverWith Force.standardErrorHandler(auth)
+        force.chatterPostMessage(auth, message, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
+      } recoverWith force.standardErrorHandler(auth)
     }
   }
 
@@ -68,12 +69,12 @@ object Actions extends Controller {
 
       val resultFuture = (maybeFileUrl, maybeFileName) match {
         case (Some(fileUrl), Some(fileName)) =>
-          Force.chatterPostFile(auth, fileUrl, fileName, maybeMessage, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
+          force.chatterPostFile(auth, fileUrl, fileName, maybeMessage, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
         case _ =>
           Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "Both the File URL and File Name are required")))
       }
 
-      resultFuture.recoverWith(Force.standardErrorHandler(auth))
+      resultFuture.recoverWith(force.standardErrorHandler(auth))
     }
   }
 
@@ -99,8 +100,8 @@ object Actions extends Controller {
       val maybeLinkUrl = (request.body \ "actionFields" \ "link").asOpt[String]
 
       maybeLinkUrl.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "The link is required")))) { linkUrl =>
-        Force.chatterPostLink(auth, linkUrl, maybeMessage, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
-      } recoverWith Force.standardErrorHandler(auth)
+        force.chatterPostLink(auth, linkUrl, maybeMessage, maybeCommunityId, maybeGroupId).map((responseJson _).tupled).map(Ok(_))
+      } recoverWith force.standardErrorHandler(auth)
     }
   }
 
@@ -112,7 +113,7 @@ object Actions extends Controller {
 
       def maybeNameValue(num: Int): Option[(String, JsValue)] = {
         (request.body \ "actionFields" \ s"field_name_$num").asOpt[String].filter(_.length > 0).map { fieldName =>
-          fieldName -> Adapters.anyJsValueToSalesforce(request.body \ "actionFields" \ s"field_value_$num")
+          fieldName -> Adapters.anyJsValueToSalesforce((request.body \ "actionFields" \ s"field_value_$num").as[JsValue])
         }
       }
 
@@ -120,7 +121,7 @@ object Actions extends Controller {
 
       maybeSobject.fold(Future.successful(BadRequest(error("MISSING_REQUIRED_FIELD", "An SObject must be specified")))) { sobject =>
 
-        Force.insert(auth, sobject, jsonToInsert).map { createJson =>
+        force.insert(auth, sobject, jsonToInsert).map { createJson =>
           val id = (createJson \ "id").as[String]
 
           val json = Json.obj(
@@ -132,16 +133,16 @@ object Actions extends Controller {
           )
 
           Ok(json)
-        } recoverWith Force.standardErrorHandler(auth)
+        } recoverWith force.standardErrorHandler(auth)
       }
     }
   }
 
-  def insertARecordFieldsSObjectOptions() = Force.sobjectOptions("createable")
+  def insertARecordFieldsSObjectOptions() = force.sobjectOptions("createable")
 
   def postOnChatterFieldsGroupOptions() = Action.async(parse.json) { request =>
     request.headers.get(AUTHORIZATION).fold(Future.successful(Unauthorized(""))) { auth =>
-      ForceIFTTT.allGroups(auth).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
+      forceIFTTT.allGroups(auth).map(Ok(_)).recoverWith(force.standardErrorHandler(auth))
     }
   }
 

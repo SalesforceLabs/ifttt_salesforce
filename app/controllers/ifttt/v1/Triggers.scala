@@ -1,18 +1,16 @@
 package controllers.ifttt.v1
 
+import com.github.t3hnar.bcrypt._
+import javax.inject.Inject
+import play.api.cache.SyncCacheApi
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import play.api.mvc.{Action, Controller, Result}
-import play.api.Play.current
-import utils.Force.ForceError
+import play.api.mvc.{InjectedController, Result}
 import utils.{Force, ForceIFTTT}
 
-import com.github.t3hnar.bcrypt._
+import scala.concurrent.{ExecutionContext, Future}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-
-object Triggers extends Controller {
+class Triggers @Inject()(force: Force, forceIFTTT: ForceIFTTT, cache: SyncCacheApi)(implicit ec: ExecutionContext) extends InjectedController {
 
   lazy val salt = generateSalt
 
@@ -33,7 +31,7 @@ object Triggers extends Controller {
     val limit = (request.body \ "limit").asOpt[Int].getOrElse(5000)
 
     request.headers.get(AUTHORIZATION).map { auth =>
-      ForceIFTTT.opportunitiesWon(auth, limit).map(Ok(_)).recoverWith(Force.standardErrorHandler(auth))
+      forceIFTTT.opportunitiesWon(auth, limit).map(Ok(_)).recoverWith(force.standardErrorHandler(auth))
     } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
   }
 
@@ -54,7 +52,7 @@ object Triggers extends Controller {
       Future.successful(BadRequest(json))
     } { eventType =>
       request.headers.get(AUTHORIZATION).map { auth =>
-        Force.describe(auth, "ifttt__IFTTT_Event__c").flatMap { describeJson =>
+        force.describe(auth, "ifttt__IFTTT_Event__c").flatMap { describeJson =>
 
           val fields = (describeJson \ "fields").as[Seq[JsObject]].map(_.\("name").as[String])
 
@@ -74,8 +72,8 @@ object Triggers extends Controller {
             |LIMIT $limit
           """.stripMargin
 
-          ForceIFTTT.iftttEventQuery(auth, query).map(Ok(_))
-        } recoverWith Force.standardErrorHandler(auth)
+          forceIFTTT.iftttEventQuery(auth, query).map(Ok(_))
+        } recoverWith force.standardErrorHandler(auth)
       } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
     }
   }
@@ -102,26 +100,27 @@ object Triggers extends Controller {
 
       request.headers.get(AUTHORIZATION).map { auth =>
 
+        // todo: why are we bcrypt'ing this?
         import com.github.t3hnar.bcrypt._
-        import play.api.cache.Cache
+
 
         val authHash = auth.bcrypt(salt)
 
         val timeStampFieldCacheKey = s"$authHash-$sobject-timestampfield"
 
-        val maybeTimeStampFieldCache = Cache.getAs[String](timeStampFieldCacheKey)
+        val maybeTimeStampFieldCache = cache.get[String](timeStampFieldCacheKey)
 
         val timeStampFieldFuture = maybeTimeStampFieldCache.map(Future.successful).getOrElse {
-          Force.describe(auth, sobject).flatMap { describeJson =>
+          force.describe(auth, sobject).flatMap { describeJson =>
             val fields = (describeJson \ "fields").as[Seq[JsObject]].map(_.\("name").as[String])
             val maybeTimeStampField = fields.find { s =>
               s == "LastModifiedDate" || s == "SystemModstamp"
             }
 
             maybeTimeStampField.fold {
-              Future.failed[String](ForceError(s"Could not find a record time stamp field on $sobject"))
+              Future.failed[String](Force.ForceError(s"Could not find a record time stamp field on $sobject"))
             } { timeStampField =>
-              Cache.set(timeStampFieldCacheKey, timeStampField)
+              cache.set(timeStampFieldCacheKey, timeStampField)
               Future.successful(timeStampField)
             }
           }
@@ -143,12 +142,12 @@ object Triggers extends Controller {
                          |LIMIT $limit
             """.stripMargin
 
-          ForceIFTTT.query(auth, query).map(Ok(_))
-        } recoverWith Force.standardErrorHandler(auth)
+          forceIFTTT.query(auth, query).map(Ok(_))
+        } recoverWith force.standardErrorHandler(auth)
       } getOrElse Future.successful(unauthorized("Authorization Header Not Set"))
     }
   }
 
-  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = Force.sobjectOptions("queryable")
+  def recordCreatedOrUpdatedTriggerFieldsSObjectOptions() = force.sobjectOptions("queryable")
 
 }

@@ -1,9 +1,11 @@
+@this(main: main, packageWarning: packageWarning)
+
 @main("Salesforce IFTTT Help") {
 
     <script>
         function switchTab(tab) {
             Array.prototype.forEach.call( document.getElementsByClassName('slds-tabs__content'), function(tabContent) {
-                if (tabContent.id == tab) {
+                if (tabContent.id === tab) {
                     tabContent.classList.remove('slds-hide');
                     tabContent.classList.add('slds-show');
                 }
@@ -14,7 +16,7 @@
             });
 
             Array.prototype.forEach.call( document.getElementsByClassName('slds-tabs__item'), function(tabItem) {
-                var selected = tabItem.firstChild.getAttribute('aria-controls') == tab;
+                var selected = tabItem.firstChild.getAttribute('aria-controls') === tab;
                 if (selected) {
                     tabItem.classList.add('slds-active');
                 }
@@ -41,23 +43,23 @@
             <br/>
             <p>
                 When you use the <a href="https://ifttt.com/salesforce">Salesforce IFTTT Channel</a> you will need to connect IFTTT with Salesforce.  IFTTT will send you to a screen that looks like:
-                <img src="@routes.Assets.at("images/activate.png")" class="screenshot">
+                <img src="@routes.Assets.versioned("images/activate.png")" class="screenshot">
             </p>
             <br/>
             <p>
                 After selecting the login button you will be asked to login to Salesforce:
-                <img src="@routes.Assets.at("images/login.png")" class="screenshot">
+                <img src="@routes.Assets.versioned("images/login.png")" class="screenshot">
             </p>
             <br/>
             <p>
                 After logging into Salesforce you will need to authorize the IFTTT application:
-                <img src="@routes.Assets.at("images/authorize.png")" class="screenshot">
+                <img src="@routes.Assets.versioned("images/authorize.png")" class="screenshot">
                 <span class="slds-text-body--small">Note: You may not have permissions to authorize this application, in which case contact your Salesforce administrator.</span>
             </p>
             <br/>
             <p>
                 You can verify that you have connected IFTTT with Salesforce by checking the <a href="https://ifttt.com/salesforce">Salesforce Channel on IFTTT</a> where you should see:
-                <img src="@routes.Assets.at("images/salesforce-channel.png")" class="screenshot">
+                <img src="@routes.Assets.versioned("images/salesforce-channel.png")" class="screenshot">
             </p>
             <br/>
             <p>
