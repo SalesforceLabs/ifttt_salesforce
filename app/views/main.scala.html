@@ -6,7 +6,7 @@
 <html>
     <head>
         <title>@title</title>
-        @webJarsUtil.locate("assets/styles/salesforce-lightning-design-system.css").css()
+        @webJarsUtil.locate("salesforce-lightning-design-system.css").css()
         <style>
             body {
                 width: 100%;
@@ -34,9 +34,9 @@
         <div class="slds-container--center slds-container--small" style="text-align: center;">
             <img src="@routes.Assets.versioned("images/salesforce.svg")" style="height: 57px">
             <svg aria-hidden="true" class="slds-icon slds-icon--small slds-icon-text-default" style="margin-bottom: 10px; margin-left: 20px;">
-                @webJarsUtil.locate("assets/icons/utility-sprite/svg/symbols.svg").path match {
+                @webJarsUtil.locate("icons/utility-sprite/svg/symbols.svg").path match {
                     case scala.util.Success(path) => {
-                        <use xlink:href="@path#add"></use>
+                        <use xlink:href="@org.webjars.play.routes.WebJarAssets.at(path)#add"></use>
                     }
                     case _ => {
 

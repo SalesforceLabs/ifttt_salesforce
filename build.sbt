@@ -12,7 +12,7 @@ libraryDependencies ++= Seq(
   "com.github.etaty" %% "rediscala" % "1.8.0",
   "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
   "org.webjars" %% "webjars-play" % "2.7.0-RC3",
-  "org.webjars" % "salesforce-lightning-design-system" % "0.9.2",
+  "org.webjars" % "salesforce-lightning-design-system" % "2.5.2",
   specs2 % Test
 )
 
