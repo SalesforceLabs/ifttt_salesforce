@@ -1,5 +1,13 @@
+/*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ */
+
 package utils
 
+import akka.NotUsed
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import javax.inject.{Inject, Singleton}
@@ -8,7 +16,7 @@ import play.api.libs.Codecs
 import play.api.libs.json._
 import play.api.libs.ws.{WSClient, WSResponse}
 import play.api.mvc.MultipartFormData.FilePart
-import play.api.mvc.{Action, InjectedController, Result}
+import play.api.mvc.{Action, InjectedController, MultipartFormData, Result}
 import play.api.{Configuration, Logging}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -190,10 +198,10 @@ class Force @Inject() (configuration: Configuration, ws: WSClient, redis: Redis)
           json ++ body
         }
 
-        val filePart = FilePart("feedElementFileUpload", fileName, Some(response.contentType), response.bodyAsSource)
-        val jsonPart = FilePart("json", "", Some(JSON), Source.single(ByteString(jsonWithMaybeMessage.toString())))
+        val filePart: MultipartFormData.Part[Source[ByteString, _]] = FilePart("feedElementFileUpload", fileName, Some(response.contentType), response.bodyAsSource)
+        val jsonPart: MultipartFormData.Part[Source[ByteString, _]] = FilePart("json", "", Some(JSON), Source.single(ByteString(jsonWithMaybeMessage.toString())))
 
-        val parts = Source(filePart :: jsonPart :: List())
+        val parts: Source[MultipartFormData.Part[Source[ByteString, _]], NotUsed] = Source(filePart :: jsonPart :: List())
 
         ws.
           url(feedUrl(userInfo, maybeCommunityId)).

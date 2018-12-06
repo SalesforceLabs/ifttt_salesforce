@@ -1,13 +1,8 @@
-PoC Salesforce IFTTT Channel
-============================
+Salesforce IFTTT Channel
+========================
 
-This is a proof-of-concept IFTTT channel for Salesforce.  You can try out the *private* channel by going to:
-https://ifttt.com/features/redeem?code=1979-d40cda75ee035941054557c5dec504cd
+This project is the code for the [Salesforce IFTTT Channel](https://ifttt.com/salesforce) and the [managed package on the App Exchange](https://appexchange.salesforce.com/appxListingDetail?listingId=a0N30000000qgiiEAA).
 
-For some triggers you will need to install a Salesforce managed package:
-http://ifttt-salesforce.herokuapp.com/
-
-This app is mostly just a bridge / JSON transformation layer between Salesforce's REST APIs and IFTTT's APIs.  It was built with Play Framework and Scala because those technologies are great at JSON transformation and Reactive / Non-Blocking IO.
 
 Developer Info
 --------------

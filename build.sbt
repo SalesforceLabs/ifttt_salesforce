@@ -1,8 +1,12 @@
-lazy val root = (project in file(".")).enablePlugins(PlayScala, ForcePlugin)
+import de.heikoseeberger.sbtheader.FileType
+
+lazy val root = (project in file(".")).enablePlugins(PlayScala, ForcePlugin, AutomateHeaderPlugin)
 
 name := "ifttt-salesforce"
 
-scalaVersion := "2.12.7"
+scalaVersion := "2.12.8"
+
+scalacOptions ++= Seq("-deprecation", "-feature")
 
 libraryDependencies ++= Seq(
   guice,
@@ -16,8 +20,32 @@ libraryDependencies ++= Seq(
   specs2 % Test
 )
 
+pipelineStages := Seq(digest, gzip)
+
 username in Force := sys.env.getOrElse("SALESFORCE_USERNAME", "")
 
 password in Force := sys.env.getOrElse("SALESFORCE_PASSWORD", "")
 
 packagedComponents in Force := Seq("com.salesforce.ifttt")
+
+// license header stuff
+
+organizationName := "Salesforce.com, Inc."
+
+startYear := Some(2018)
+
+licenses += "BSD-3-Clause" -> url("https://opensource.org/licenses/BSD-3-Clause")
+
+headerMappings += FileType("html") -> HeaderCommentStyle.twirlStyleBlockComment
+
+headerLicense := Some(
+  HeaderLicense.Custom(
+    """|Copyright (c) 2018, Salesforce.com, Inc.
+       |All rights reserved.
+       |SPDX-License-Identifier: BSD-3-Clause
+       |For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+       |""".stripMargin
+  )
+)
+
+headerSources.in(Compile) ++= sources.in(Compile, TwirlKeys.compileTemplates).value
