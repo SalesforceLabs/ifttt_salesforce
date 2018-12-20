@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ */
+
 package utils
 
 import play.api.libs.json.{JsObject, Json}
@@ -51,9 +58,9 @@ class ForceSpec extends PlaySpecification {
 
   "chatterPostFile" should {
     "post a file to a user feed" in new WithApplication() {
-      val json = await(force.chatterPostFile(authToken, "http://www.jamesward.com/images/james_ward_2015.jpg", "foooo.png", None, None, None))
+      val json = await(force.chatterPostFile(authToken, "https://www.jamesward.com/uploads/2007/01/james_profile_2011-160x160.jpg", "foooo.png", None, None, None))
       (json._1 \ "id").asOpt[String] should beSome
-      (json._1 \ "capabilities" \ "content" \ "checksum").asOpt[String] should beSome("6a1fa22d29a720ac58930c3ababdf05b")
+      (json._1 \ "capabilities" \ "content" \ "checksum").asOpt[String] should beSome("229480d306fc2e0a59d96a66761d5865")
     }
   }
 
