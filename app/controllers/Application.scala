@@ -10,7 +10,7 @@ package controllers
 import javax.inject.Inject
 import modules.Redis
 import play.api.mvc.InjectedController
-import utils.{Crypto, Force}
+import utils.Force
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -31,14 +31,13 @@ class Application @Inject()
     Ok(helpView())
   }
 
-  def errors = Action.async { request =>
-    request.flash.get("enc_access_token").fold {
-      val redirUrl = routes.OAuth2.authorized().absoluteURL(secure = request.secure)(request)
+  def errors = Action.async { implicit request =>
+    request.flash.get("access_token").fold {
+      val redirUrl = routes.OAuth2.authorized().absoluteURL()
       val qs = s"client_id=${force.salesforceOauthKey}&state=local-errors&response_type=code&prompt=login&redirect_uri=$redirUrl"
 
       Future.successful(Ok(authorizeErrorsView(qs)))
-    } { encAccessToken =>
-      val accessToken = Crypto.decryptAES(encAccessToken)
+    } { accessToken =>
       val auth = s"Bearer $accessToken"
       force.userinfo(auth).flatMap { userInfo =>
         val userId = (userInfo \ "user_id").as[String]
@@ -51,23 +50,22 @@ class Application @Inject()
               views.html.standardError(error).toString()
           }
 
-          Ok(errorsView(friendlyErrors, encAccessToken))
+          Ok(errorsView(friendlyErrors)).flash("access_token" -> accessToken)
         }
       } recoverWith force.standardErrorHandler(auth)
     }
   }
 
   def errorsClear = Action.async(parse.formUrlEncoded) { request =>
-    request.body.get("enc_access_token").flatMap(_.headOption).fold {
+    request.flash.get("access_token").fold {
       Future.successful(Unauthorized("No access token in scope"))
-    } { encAccessToken =>
-      val accessToken = Crypto.decryptAES(encAccessToken)
+    } { accessToken =>
       val auth = s"Bearer $accessToken"
       force.userinfo(auth).flatMap { userInfo =>
         val userId = (userInfo \ "user_id").as[String]
 
         redis.client.del(userId).map { errors =>
-          Redirect(routes.Application.errors()).flash("enc_access_token" -> encAccessToken)
+          Redirect(routes.Application.errors()).flash("access_token" -> accessToken)
         }
       } recoverWith force.standardErrorHandler(auth)
     }

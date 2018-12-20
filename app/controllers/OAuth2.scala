@@ -14,7 +14,7 @@ import play.api.libs.json.Reads._
 import play.api.libs.json._
 import play.api.libs.ws.WSClient
 import play.api.mvc._
-import utils.{Crypto, Force, ForceIFTTT}
+import utils.{Force, ForceIFTTT}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -104,8 +104,7 @@ class OAuth2 @Inject()
           val r = request.map(_ => body)
           tokenCode(r, code).map { json =>
             (json \ "access_token").asOpt[String].fold(Unauthorized("Could not login")) { accessToken =>
-              val encAccessToken = Crypto.encryptAES(accessToken)
-              Redirect(s"/$url").flash("enc_access_token" -> encAccessToken)
+              Redirect(s"/$url").flash("access_token" -> accessToken)
             }
           } recover {
             case e: Exception => InternalServerError(e.getMessage)

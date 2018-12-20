@@ -19,8 +19,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class Triggers @Inject()(force: Force, forceIFTTT: ForceIFTTT, cache: SyncCacheApi)(implicit ec: ExecutionContext) extends InjectedController {
 
-  lazy val salt = generateSalt
-
   private def unauthorized(error: String): Result = {
     Unauthorized(
       Json.obj(
@@ -106,12 +104,7 @@ class Triggers @Inject()(force: Force, forceIFTTT: ForceIFTTT, cache: SyncCacheA
     } { case (sobject, queryCriteria) =>
 
       request.headers.get(AUTHORIZATION).map { auth =>
-
-        // todo: why are we bcrypt'ing this?
-        import com.github.t3hnar.bcrypt._
-
-
-        val authHash = auth.bcrypt(salt)
+        val authHash = auth.bcrypt
 
         val timeStampFieldCacheKey = s"$authHash-$sobject-timestampfield"
 
