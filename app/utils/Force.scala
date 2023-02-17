@@ -36,18 +36,17 @@ class Force @Inject() (configuration: Configuration, ws: WSClient, redis: Redis)
 
   // todo: maybe put an in-memory cache here since this can get called a lot
   def userinfo(auth: String): Future[JsValue] = {
-    redis.client.get[String](Codecs.sha1(bearerAuth(auth))).flatMap { maybeEnv =>
-      val env = maybeEnv.getOrElse(ENV_PROD)
-      ws.url(userinfoUrl(env)).withHttpHeaders(AUTHORIZATION -> bearerAuth(auth)).get().flatMap { userInfoResponse =>
-        userInfoResponse.status match {
-          case OK =>
-            Future.successful(userInfoResponse.json)
-          case UNAUTHORIZED | FORBIDDEN =>
-            Future.failed(UnauthorizedException(userInfoResponse.body))
-          case _ =>
-            val jsonTry = Try(userInfoResponse.json)
-            Future.failed(jsonTry.map(ForceError.apply).getOrElse(new Exception("Could not get user info: " + userInfoResponse.body)))
-        }
+    val maybeEnv = redis.client.get[String](Codecs.sha1(bearerAuth(auth)))
+    val env = maybeEnv.getOrElse(ENV_PROD)
+    ws.url(userinfoUrl(env)).withHttpHeaders(AUTHORIZATION -> bearerAuth(auth)).get().flatMap { userInfoResponse =>
+      userInfoResponse.status match {
+        case OK =>
+          Future.successful(userInfoResponse.json)
+        case UNAUTHORIZED | FORBIDDEN =>
+          Future.failed(UnauthorizedException(userInfoResponse.body))
+        case _ =>
+          val jsonTry = Try(userInfoResponse.json)
+          Future.failed(jsonTry.map(ForceError.apply).getOrElse(new Exception("Could not get user info: " + userInfoResponse.body)))
       }
     }
   }
@@ -353,9 +352,10 @@ class Force @Inject() (configuration: Configuration, ws: WSClient, redis: Redis)
   def instanceUrl(value: JsValue) = (value \ "profile").as[String].stripSuffix((value \ "user_id").as[String])
 
   def saveError(auth: String, error: String)(result: => Result): Future[Result] = {
-    userinfo(auth).flatMap { userInfo =>
+    userinfo(auth).map { userInfo =>
       val userId = (userInfo \ "user_id").as[String]
-      redis.client.lpush(userId, error).map(_ => result)
+      redis.client.lpush(userId, error)
+      result
     } recover {
       case e: Exception =>
         logger.error(e.getMessage)
