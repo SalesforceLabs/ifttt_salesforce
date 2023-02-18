@@ -144,57 +144,54 @@ class OAuth2 @Inject()
   }
 
   private def tokenRefresh(request: Request[Map[String, Seq[String]]], refreshToken: String): Future[JsValue] = {
-    redis.client.get[String](Codecs.sha1(refreshToken)).flatMap { maybeEnv =>
-      val env = maybeEnv.getOrElse(Force.ENV_PROD)
+    val maybeEnv = redis.client.get[String](Codecs.sha1(refreshToken))
+    val env = maybeEnv.getOrElse(Force.ENV_PROD)
 
-      val tokenFuture = ws.url(force.loginUrl(env)).post(request.body)
+    val tokenFuture = ws.url(force.loginUrl(env)).post(request.body)
 
-      tokenFuture.flatMap { response =>
-        response.status match {
-          case OK =>
-            (response.json \ "access_token").asOpt[String].fold {
-              Future.failed[JsValue](LoginException("Could not retrieve the access token: " + response.body))
-            } { accessToken =>
-              redis.client.set(Codecs.sha1(s"Bearer $accessToken"), env).map { _ =>
-                // adding the refresh token back into the json because ifttt needs it
-                response.json.as[JsObject] + ("refresh_token" -> JsString(refreshToken))
-              }
-            }
-          case UNAUTHORIZED =>
-            Future.failed(LoginException(response.body))
-          case BAD_REQUEST =>
-            Future.failed(LoginException((response.json \ "error_description").as[String]))
-          case _ =>
-            Future.failed(new Exception(response.body))
-        }
+    tokenFuture.flatMap { response =>
+      response.status match {
+        case OK =>
+          (response.json \ "access_token").asOpt[String].fold {
+            Future.failed[JsValue](LoginException("Could not retrieve the access token: " + response.body))
+          } { accessToken =>
+            redis.client.set(Codecs.sha1(s"Bearer $accessToken"), env)
+            // adding the refresh token back into the json because ifttt needs it
+            Future.successful(response.json.as[JsObject] + ("refresh_token" -> JsString(refreshToken)))
+          }
+        case UNAUTHORIZED =>
+          Future.failed(LoginException(response.body))
+        case BAD_REQUEST =>
+          Future.failed(LoginException((response.json \ "error_description").as[String]))
+        case _ =>
+          Future.failed(new Exception(response.body))
       }
     }
   }
 
   private def tokenCode(request: Request[Map[String, Seq[String]]], code: String): Future[JsValue] = {
-    redis.client.get[String](Codecs.sha1(code)).flatMap { maybeEnv =>
-      val env = maybeEnv.getOrElse(Force.ENV_PROD)
+    val maybeEnv = redis.client.get[String](Codecs.sha1(code))
+    val env = maybeEnv.getOrElse(Force.ENV_PROD)
 
-      val bodyWithRedir = request.body.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure =  true)(request)))
+    val bodyWithRedir = request.body.updated("redirect_uri", Seq(routes.OAuth2.authorized().absoluteURL(secure =  true)(request)))
 
-      val tokenFuture = ws.url(force.loginUrl(env)).post(bodyWithRedir)
+    val tokenFuture = ws.url(force.loginUrl(env)).post(bodyWithRedir)
 
-      tokenFuture.flatMap { response =>
-        val maybeRefreshAccessTokens = for {
-          refreshToken <- (response.json \ "refresh_token").asOpt[String]
-          accessToken <- (response.json \ "access_token").asOpt[String]
-        } yield (refreshToken, accessToken)
+    tokenFuture.flatMap { response =>
+      val maybeRefreshAccessTokens = for {
+        refreshToken <- (response.json \ "refresh_token").asOpt[String]
+        accessToken <- (response.json \ "access_token").asOpt[String]
+      } yield (refreshToken, accessToken)
 
-        maybeRefreshAccessTokens.fold {
-          val error = (response.json \ "error_description").asOpt[String].getOrElse("Unknown Error")
-          Future.failed[JsValue](LoginException(s"Could not retrieve refresh and access tokens: $error"))
-        } { case (refreshToken, accessToken) =>
-          // store the hash of the refresh token with the env in redis
-          redis.client.set(Codecs.sha1(refreshToken), env).flatMap { _ =>
-            // store the hash of the access token with the env in redis
-            redis.client.set(Codecs.sha1(s"Bearer $accessToken"), env).map(_ => response.json)
-          }
-        }
+      maybeRefreshAccessTokens.fold {
+        val error = (response.json \ "error_description").asOpt[String].getOrElse("Unknown Error")
+        Future.failed[JsValue](LoginException(s"Could not retrieve refresh and access tokens: $error"))
+      } { case (refreshToken, accessToken) =>
+        // store the hash of the refresh token with the env in redis
+        redis.client.set(Codecs.sha1(refreshToken), env)
+        // store the hash of the access token with the env in redis
+        redis.client.set(Codecs.sha1(s"Bearer $accessToken"), env)
+        Future.successful(response.json)
       }
     }
   }

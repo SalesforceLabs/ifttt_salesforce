@@ -8,14 +8,14 @@
 package modules
 
 import java.net.URI
-
 import akka.actor.ActorSystem
+import com.redis.RedisClient
+import org.apache.http.ssl.{SSLContexts, TrustStrategy}
+
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
-import redis.RedisClient
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
+import java.security.cert.X509Certificate
 
 @Singleton
 class Redis @Inject() (configuration: Configuration) (implicit actorSystem: ActorSystem) {
@@ -25,9 +25,16 @@ class Redis @Inject() (configuration: Configuration) (implicit actorSystem: Acto
 
     val passwordOpt = Option(url.getUserInfo).flatMap(_.split(":").lastOption)
 
-    RedisClient(url.getHost, url.getPort, passwordOpt)
+    val sslContext = SSLContexts
+      .custom()
+      .loadTrustMaterial(null, new TrustStrategy() {
+        def isTrusted(arg0: Array[X509Certificate], arg1: String) = true
+      })
+      .build()
+
+    new RedisClient(url.getHost, url.getPort, secret = passwordOpt, sslContext = Some(sslContext))
   }
 
-  Await.result(client.ping(), 30.seconds)
+  client.ping.get
 
 }

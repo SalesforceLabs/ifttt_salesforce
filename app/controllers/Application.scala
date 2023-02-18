@@ -39,19 +39,19 @@ class Application @Inject()
       Future.successful(Ok(authorizeErrorsView(qs)))
     } { accessToken =>
       val auth = s"Bearer $accessToken"
-      force.userinfo(auth).flatMap { userInfo =>
+      force.userinfo(auth).map { userInfo =>
         val userId = (userInfo \ "user_id").as[String]
 
-        redis.client.lrange[String](userId, 0, -1).map { errors =>
-          val friendlyErrors = errors.distinct.map {
-            case error if error.contains("Object type 'ifttt__IFTTT_Event__c' is not supported") =>
-              packageNotFoundView().toString()
-            case error =>
-              views.html.standardError(error).toString()
-          }
-
-          Ok(errorsView(friendlyErrors)).flash("access_token" -> accessToken)
+        val errors = redis.client.lrange[String](userId, 0, -1).getOrElse(List.empty)
+        val friendlyErrors = errors.distinct.map {
+          case error if error.contains("Object type 'ifttt__IFTTT_Event__c' is not supported") =>
+            packageNotFoundView().toString()
+          case error =>
+            val msg = error.getOrElse("Error")
+            views.html.standardError(msg).toString()
         }
+
+        Ok(errorsView(friendlyErrors)).flash("access_token" -> accessToken)
       } recoverWith force.standardErrorHandler(auth)
     }
   }
@@ -61,12 +61,11 @@ class Application @Inject()
       Future.successful(Unauthorized("No access token in scope"))
     } { accessToken =>
       val auth = s"Bearer $accessToken"
-      force.userinfo(auth).flatMap { userInfo =>
+      force.userinfo(auth).map { userInfo =>
         val userId = (userInfo \ "user_id").as[String]
 
-        redis.client.del(userId).map { errors =>
-          Redirect(routes.Application.errors()).flash("access_token" -> accessToken)
-        }
+        redis.client.del(userId)
+        Redirect(routes.Application.errors()).flash("access_token" -> accessToken)
       } recoverWith force.standardErrorHandler(auth)
     }
   }

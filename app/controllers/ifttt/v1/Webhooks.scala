@@ -75,22 +75,21 @@ class Webhooks @Inject() (redis: Redis, ws: WSClient, forceIFTTT: ForceIFTTT) (i
 
     val orgId = (request.body \ "orgId").as[String]
 
-    redis.client.smembers[String](orgId).flatMap { watchers =>
+    val watchers = redis.client.smembers[String](orgId)
 
-      import java.util.UUID
+    import java.util.UUID
 
-      val json = Json.obj(
-        "data" -> watchers.map { userId =>
-          Json.obj("user_id" -> userId)
-        }
-      )
+    val json = Json.obj(
+      "data" -> watchers.map { userId =>
+        Json.obj("user_id" -> userId)
+      }
+    )
 
-      ws.
-        url("https://realtime.ifttt.com/v1/notifications").
-        withHttpHeaders("IFTTT-Channel-Key" -> forceIFTTT.ifffChannelKey, "X-Request-ID" -> UUID.randomUUID().toString).
-        post(json).
-        map(_ => Ok)
-    }
+    ws.
+      url("https://realtime.ifttt.com/v1/notifications").
+      withHttpHeaders("IFTTT-Channel-Key" -> forceIFTTT.ifffChannelKey, "X-Request-ID" -> UUID.randomUUID().toString).
+      post(json).
+      map(_ => Ok)
   }
 
 }

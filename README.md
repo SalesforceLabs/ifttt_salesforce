@@ -31,7 +31,7 @@ To setup a local development environment do the following:
         export IFTTT_CHANNEL_KEY=<YOUR IFTTT CHANNEL KEY>
         export IFTTT_TEST_ACCESSTOKEN=<YOUR TESTING SALESFORCE ACCESS TOKEN>
 
-1. Start the Play app: `./activator ~run`
+1. Start the Play app: `./sbt ~run`
 1. Run the IFTTT Channel Activation Test
 1. Setup the IFTTT Triggers and Actions
     * TODO
@@ -46,8 +46,8 @@ Salesforce Metadata
 
 Fetch the metadata:
 
-    SALESFORCE_USERNAME=foo@bar.com SALESFORCE_PASSWORD=password ./activator force:fetch
+    SALESFORCE_USERNAME=foo@bar.com SALESFORCE_PASSWORD=password ./sbt force:fetch
 
 Deploy the metadata:
 
-    SALESFORCE_USERNAME=foo@bar.com SALESFORCE_PASSWORD=password ./activator force:deploy
+    SALESFORCE_USERNAME=foo@bar.com SALESFORCE_PASSWORD=password ./sbt force:deploy
